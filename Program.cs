@@ -158,7 +158,7 @@ async Task work(string path) {
 	await temptotxtAsync($"{filename}_shit.tmp");
 	temptotxtAsync($"{filename}_good.tmp").Wait();
 }
-
+ 
 while (true) {
 	Console.Clear();
 	Console.WriteLine("Drop a file here: ");
