@@ -58,7 +58,6 @@ string hexfix(string line) {
 		System.Globalization.NumberStyles.HexNumber)));
 }
 
-//async List<string> dnscheck(string path) {
 async Task<List<string>> dnscheck(string path) {
 	List<string> bigdomains = new();
 	using StreamReader reader1 = new("BigDomains");
