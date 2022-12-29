@@ -2,9 +2,8 @@
 using System.Text.RegularExpressions;
 using System.Net;
 using System.IO;
+using System.Threading;
 
-string[] gmails = new string[2] { "googlemail.com", "gmail.com" };
-string[] yandexs = new string[6] { "ya.ru", "yandex.com", "yandex.ru", "yandex.by", "yandex.kz", "yandex.ua" };
 string? tmpline;
 List<string> tempdomains = new();
 using StreamReader reader = new("TempMails");
@@ -59,47 +58,57 @@ string hexfix(string line) {
 		System.Globalization.NumberStyles.HexNumber)));
 }
 
-List<string> dnscheck(string path) {
-	List<string> domains = new List<string>();
+//async List<string> dnscheck(string path) {
+async Task<List<string>> dnscheck(string path) {
+	List<string> bigdomains = new();
+	using StreamReader reader1 = new("BigDomains");
+	while ((tmpline = reader1.ReadLine()) != null)
+		bigdomains.Add(tmpline);
+	List<string> domains = new();
 	string? line;
 	int i = 0;
 	using StreamReader reader = new(path);
 	while ((line = reader.ReadLine()) != null) {
-		if (i % 5000 == 0) {
+		if (i % 10000 == 0) {
+			clean();
 			Console.Clear();
 			Console.WriteLine($"Checking DNS addresses.\nAdding {i} domain to list.");
+			Console.Title = $"Checking DNS addresses. Adding {i} domain to list.";
 		}
-		domains.Add(line.Split(':')[0].Split('@')[1]);
+		if (domainRegex().IsMatch(line) && !domains.Contains(domainRegex().Match(line).Groups[1].Value) && !bigdomains.Contains(domain1Regex().Match(line).Groups[1].Value))
+			domains.Add(domainRegex().Match(line).Groups[1].Value);
 		i++;
 	}
 	Console.Clear();
-	Console.WriteLine($"Checking DNS addresses.\nDeleting duplicates.");
-	domains.Distinct();
-	Console.Clear();
 	Console.WriteLine($"Checking DNS addresses.\nSorting.");
 	domains.Sort();
-	List<string> baddomains = domains;
-	int max = baddomains.Count;
+	int max = domains.Count;
 	i = 0;
-	foreach (string domain in domains) {
+	while (i < max) {
 		if (i % 10 == 0) {
 			Console.Clear();
 			Console.WriteLine($"Checking DNS addresses.\nChecking TXT of {i} / {max}.");
+			Console.Title = $"Checking DNS addresses. Checking TXT of {i} / {max}.";
 		}
 		try {
-			IPHostEntry host = Dns.GetHostEntry(domain);
-			if (host.AddressList.Length > 0)
-				baddomains.Remove(domain);
+			CancellationTokenSource tokenSource = new(TimeSpan.FromSeconds(1));
+			var txtRecords = await Dns.GetHostEntryAsync(domains[i], tokenSource.Token);
+			if (txtRecords.AddressList.Length > 0)
+				domains.RemoveAt(i);
+			continue;
 		}
 		catch (Exception) { }
 		i++;
 	}
-	return baddomains;
+	return domains;
 }
 
 string ProcessLine(string line, List<string> baddns) {
+	string[] gmails = new string[2] { "googlemail.com", "gmail.com" };
+	string[] yandexs = new string[6] { "ya.ru", "yandex.com", "yandex.ru", "yandex.by", "yandex.kz", "yandex.ua" };
+
 	//EMAIL REGEX CHECK
-	
+
 	if (!loginpassRegex().IsMatch(line))
 		return $"#BadSyntax#";
 	
@@ -168,7 +177,8 @@ string ProcessLine(string line, List<string> baddns) {
 }
 
 async Task work(string path) {
-	List<string> baddns = dnscheck(path);
+	List<string> baddns = await dnscheck(path);
+	
 	string? line, result, filename = Path.GetFileNameWithoutExtension(path);
 	int i = 0, shit_c = 0, good_c = 0, lines = linescount(path);
 	if (File.Exists($"{filename}_shit.txt")) File.Delete($"{filename}_shit.txt");
@@ -177,12 +187,15 @@ async Task work(string path) {
 	if (File.Exists($"{filename}_good.tmp")) File.Delete($"{filename}_good.tmp");
 	Console.Clear();
 	Console.WriteLine($"{i} / {lines}\nGood: {good_c} | Shit: {shit_c}");
+	Console.Title = $"Working with {filename}. {i} / {lines} | Good: {good_c} | Shit: {shit_c}";
 	using StreamReader reader = new(path);
 	while ((line = reader.ReadLine()) != null) {
-		if (i % 5000 == 0) {
-			clean();
+		if (i % 2000 == 0) {
+			if (i % 10000 == 0)
+				clean();
 			Console.Clear();
 			Console.WriteLine($"{i} / {lines}\nGood: {good_c} | Shit: {shit_c}");
+			Console.Title = $"Working with {filename}. {i} / {lines} | Good: {good_c} | Shit: {shit_c}";
 		}
 		result = ProcessLine(line, baddns);
 		if (shitRegex().IsMatch(result)) {
@@ -197,11 +210,14 @@ async Task work(string path) {
 	}
 	Console.Clear();
 	Console.WriteLine($"{i} / {lines}\nGood: {good_c} | Shit: {shit_c}");
+	Console.Title = $"Working with {filename}. {i} / {lines} | Good: {good_c} | Shit: {shit_c}";
 	await temptotxtAsync($"{filename}_shit.tmp");
 	temptotxtAsync($"{filename}_good.tmp").Wait();
+	Console.Title = "Idle.";
 }
- 
+
 while (true) {
+	Console.Title = "Idle.";
 	Console.Clear();
 	Console.WriteLine("Drop a file here: ");
 	string? path = Console.ReadLine();
@@ -231,7 +247,13 @@ partial class Program {
 
 	[GeneratedRegex(@"^(?:[A-z\d+/]{4})*(?:[A-z\d+/]{2}==|[A-z\d+/]{3}=)?$")]
 	private static partial Regex base64Regex();
-	
+
 	[GeneratedRegex(@"&[A-z\d]{2,6};")]
 	private static partial Regex htmlencodeRegex();
+
+	[GeneratedRegex(@"@([\w-]+(?:\.[\w-]+)+):")]
+	private static partial Regex domainRegex();
+
+	[GeneratedRegex(@"@([\w-]+)\..*?:")]
+	private static partial Regex domain1Regex();
 }
