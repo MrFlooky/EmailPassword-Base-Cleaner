@@ -59,7 +59,45 @@ string hexfix(string line) {
 		System.Globalization.NumberStyles.HexNumber)));
 }
 
-string ProcessLine(string line) {
+List<string> dnscheck(string path) {
+	List<string> domains = new List<string>();
+	string? line;
+	int i = 0;
+	using StreamReader reader = new(path);
+	while ((line = reader.ReadLine()) != null) {
+		if (i % 5000 == 0) {
+			Console.Clear();
+			Console.WriteLine($"Checking DNS addresses.\nAdding {i} domain to list.");
+		}
+		domains.Add(line.Split(':')[0].Split('@')[1]);
+		i++;
+	}
+	Console.Clear();
+	Console.WriteLine($"Checking DNS addresses.\nDeleting duplicates.");
+	domains.Distinct();
+	Console.Clear();
+	Console.WriteLine($"Checking DNS addresses.\nSorting.");
+	domains.Sort();
+	List<string> baddomains = domains;
+	int max = baddomains.Count;
+	i = 0;
+	foreach (string domain in domains) {
+		if (i % 10 == 0) {
+			Console.Clear();
+			Console.WriteLine($"Checking DNS addresses.\nChecking TXT of {i} / {max}.");
+		}
+		try {
+			IPHostEntry host = Dns.GetHostEntry(domain);
+			if (host.AddressList.Length > 0)
+				baddomains.Remove(domain);
+		}
+		catch (Exception) { }
+		i++;
+	}
+	return baddomains;
+}
+
+string ProcessLine(string line, List<string> baddns) {
 	//EMAIL REGEX CHECK
 	
 	if (!loginpassRegex().IsMatch(line))
@@ -96,6 +134,9 @@ string ProcessLine(string line) {
 	if (baddomains.Contains(logindomain[1]))
 		return $"#BadDomain#";
 
+	if (baddns.Contains(logindomain[1]))
+		return $"#BadDNS#";
+
 	//ALL LINE FIX
 
 	if (htmlencodeRegex().Matches(line).Count > 0)
@@ -127,6 +168,7 @@ string ProcessLine(string line) {
 }
 
 async Task work(string path) {
+	List<string> baddns = dnscheck(path);
 	string? line, result, filename = Path.GetFileNameWithoutExtension(path);
 	int i = 0, shit_c = 0, good_c = 0, lines = linescount(path);
 	if (File.Exists($"{filename}_shit.txt")) File.Delete($"{filename}_shit.txt");
@@ -142,7 +184,7 @@ async Task work(string path) {
 			Console.Clear();
 			Console.WriteLine($"{i} / {lines}\nGood: {good_c} | Shit: {shit_c}");
 		}
-		result = ProcessLine(line);
+		result = ProcessLine(line, baddns);
 		if (shitRegex().IsMatch(result)) {
 			File.AppendAllText($"{filename}_shit.tmp", $"{result} {line}\r\n");
 			shit_c++;
