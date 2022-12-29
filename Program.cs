@@ -1,8 +1,6 @@
 ﻿using System.Text;
 using System.Text.RegularExpressions;
 using System.Net;
-using System.IO;
-using System.Threading;
 
 string? tmpline;
 List<string> tempdomains = new();
@@ -13,7 +11,7 @@ List<string> baddomains = new();
 using StreamReader reader1 = new("BadDomain");
 while ((tmpline = reader1.ReadLine()) != null)
 	baddomains.Add(tmpline);
-int linescount(string path) {
+int GetLinesCount(string path) {
 	int i = 0;
 	using (StreamReader sr = new(path)) {
 		while (sr.ReadLine() != null)
@@ -22,7 +20,7 @@ int linescount(string path) {
 	return i;
 }
 
-async Task temptotxtAsync(string file) {
+async Task TempToTxtAsync(string file) {
 	if (!File.Exists(file)) return;
 	using (StreamReader reader = new(file)) {
 		HashSet<string> lines = new();
@@ -34,23 +32,23 @@ async Task temptotxtAsync(string file) {
 			}
 		lines.Clear();
 		tempList.Sort();
-		clean();
+		Clean();
 		using StreamWriter writer = new(file.Replace(".tmp", ".txt"));
 		foreach (string line in tempList)
 			await writer.WriteLineAsync(line);
 		writer.Close();
 		tempList.Clear();
-		clean();
+		Clean();
 	}
 	File.Delete(file);
 }
 
-void clean() {
+void Clean() {
 	GC.Collect();
 	GC.WaitForPendingFinalizers();
 }
 
-string hexfix(string line) {
+string HexFix(string line) {
 	line = line.Replace("$HEX[", "").Replace("]", "");
 	return string.Join("", Enumerable.Range(0, line.Length)
 		.Where(x => x % 2 == 0)
@@ -69,7 +67,7 @@ async Task<List<string>> dnscheck(string path) {
 	using StreamReader reader = new(path);
 	while ((line = reader.ReadLine()) != null) {
 		if (i % 10000 == 0) {
-			clean();
+			Clean();
 			Console.Clear();
 			Console.WriteLine($"Checking DNS addresses.\nAdding {i} domain to list.");
 			Console.Title = $"Checking DNS addresses. Adding {i} domain to list.";
@@ -167,7 +165,7 @@ string ProcessLine(string line, List<string> baddns) {
 		mailpass[1] = mailpass[1].Replace("{slash}", "/").Replace("{eq}", "=");
 
 	if (mailpass[1].Contains("$HEX["))
-		mailpass[1] = hexfix(mailpass[1]);
+		mailpass[1] = HexFix(mailpass[1]);
 
 	//if (base64Regex().IsMatch(mailpass[1]))
 	//	mailpass[1] = Encoding.UTF8.GetString(Convert.FromBase64String(mailpass[1]));
@@ -175,11 +173,11 @@ string ProcessLine(string line, List<string> baddns) {
 	return $"{logindomain[0]}@{logindomain[1]}:{mailpass[1]}";
 }
 
-async Task work(string path) {
+async Task MainWork(string path) {
 	List<string> baddns = await dnscheck(path);
 	
 	string? line, result, filename = Path.GetFileNameWithoutExtension(path);
-	int i = 0, shit_c = 0, good_c = 0, lines = linescount(path);
+	int i = 0, shit_c = 0, good_c = 0, lines = GetLinesCount(path);
 	if (File.Exists($"{filename}_shit.txt")) File.Delete($"{filename}_shit.txt");
 	if (File.Exists($"{filename}_shit.tmp")) File.Delete($"{filename}_shit.tmp");
 	if (File.Exists($"{filename}_good.txt")) File.Delete($"{filename}_good.txt");
@@ -191,7 +189,7 @@ async Task work(string path) {
 	while ((line = reader.ReadLine()) != null) {
 		if (i % 2000 == 0) {
 			if (i % 10000 == 0)
-				clean();
+				Clean();
 			Console.Clear();
 			Console.WriteLine($"{i} / {lines}\nGood: {good_c} | Shit: {shit_c}");
 			Console.Title = $"Working with {filename}. {i} / {lines} | Good: {good_c} | Shit: {shit_c}";
@@ -210,8 +208,8 @@ async Task work(string path) {
 	Console.Clear();
 	Console.WriteLine($"{i} / {lines}\nGood: {good_c} | Shit: {shit_c}");
 	Console.Title = $"Working with {filename}. {i} / {lines} | Good: {good_c} | Shit: {shit_c}";
-	await temptotxtAsync($"{filename}_shit.tmp");
-	temptotxtAsync($"{filename}_good.tmp").Wait();
+	await TempToTxtAsync($"{filename}_shit.tmp");
+	TempToTxtAsync($"{filename}_good.tmp").Wait();
 	Console.Title = "Idle.";
 }
 
@@ -222,7 +220,7 @@ while (true) {
 	string? path = Console.ReadLine();
 	Console.Clear();
 	if (pathRegex().IsMatch(path) && File.Exists(path)) {
-		work(path).Wait();
+		MainWork(path).Wait();
 	}
 	else {
 		Console.WriteLine("Drop a text file.");
