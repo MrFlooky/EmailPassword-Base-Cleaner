@@ -7,10 +7,13 @@ List<string> tempdomains = new();
 using StreamReader reader = new("TempMails");
 while ((tmpline = reader.ReadLine()) != null)
 	tempdomains.Add(tmpline);
+reader.Close();
 List<string> baddomains = new();
 using StreamReader reader1 = new("BadDomain");
 while ((tmpline = reader1.ReadLine()) != null)
 	baddomains.Add(tmpline);
+reader1.Close();
+
 int GetLinesCount(string path) {
 	int i = 0;
 	using (StreamReader sr = new(path)) {
@@ -56,12 +59,17 @@ string HexFix(string line) {
 		System.Globalization.NumberStyles.HexNumber)));
 }
 
-async Task<List<string>> dnscheck(string path) {
-	List<string> bigdomains = new();
+async Task<List<string>> DNSCheck(string path) {
+	List<string> bigdomains = new(), domains = new();
 	using StreamReader reader1 = new("BigDomains");
 	while ((tmpline = reader1.ReadLine()) != null)
 		bigdomains.Add(tmpline);
-	List<string> domains = new();
+	reader1.Close();
+	List<string> baddns = new();
+	using StreamReader reader2 = new("BadDNS");
+	while ((tmpline = reader2.ReadLine()) != null)
+		baddns.Add(tmpline);
+	reader2.Close();
 	string? line;
 	int i = 0;
 	using StreamReader reader = new(path);
@@ -73,9 +81,10 @@ async Task<List<string>> dnscheck(string path) {
 			Console.Title = $"Checking DNS addresses. Adding {i} domain to list.";
 		}
 		if (domainRegex().IsMatch(line) && !domains.Contains(domainRegex().Match(line).Groups[1].Value) && !bigdomains.Contains(domain1Regex().Match(line).Groups[1].Value))
-			domains.Add(domainRegex().Match(line).Groups[1].Value);
+			domains.Add(domainRegex().Match(line).Groups[1].Value.ToLower());
 		i++;
 	}
+	reader.Close();
 	Console.Clear();
 	Console.WriteLine($"Checking DNS addresses.\nSorting.");
 	domains.Sort();
@@ -87,17 +96,24 @@ async Task<List<string>> dnscheck(string path) {
 			Console.WriteLine($"Checking DNS addresses.\nChecking TXT of {i} / {max}.");
 			Console.Title = $"Checking DNS addresses. Checking TXT of {i} / {max}.";
 		}
-		try {
-			CancellationTokenSource tokenSource = new(TimeSpan.FromSeconds(1));
-			var txtRecords = await Dns.GetHostEntryAsync(domains[i], tokenSource.Token);
-			if (txtRecords.AddressList.Length > 0)
-				domains.RemoveAt(i);
-			continue;
+		if (!baddns.Contains(domains[i]) && !tempdomains.Contains(domains[i])) {
+			try {
+				CancellationTokenSource tokenSource = new(TimeSpan.FromSeconds(1));
+				var txtRecords = await Dns.GetHostEntryAsync(domains[i], tokenSource.Token);
+				if (txtRecords.AddressList.Length == 0) {
+					baddns.Add(domains[i]);
+					File.AppendAllText("BadDNS", $"{domains[i]}\r\n");
+				}
+			}
+			catch (Exception) {
+				baddns.Add(domains[i]);
+				File.AppendAllText("BadDNS", $"{domains[i]}\r\n");
+			}
 		}
-		catch (Exception) { }
 		i++;
 	}
-	return domains;
+	Clean();
+	return baddns;
 }
 
 string ProcessLine(string line, List<string> baddns) {
@@ -174,8 +190,7 @@ string ProcessLine(string line, List<string> baddns) {
 }
 
 async Task MainWork(string path) {
-	List<string> baddns = await dnscheck(path);
-	
+	List<string> baddns = await DNSCheck(path);
 	string? line, result, filename = Path.GetFileNameWithoutExtension(path);
 	int i = 0, shit_c = 0, good_c = 0, lines = GetLinesCount(path);
 	if (File.Exists($"{filename}_shit.txt")) File.Delete($"{filename}_shit.txt");
@@ -205,6 +220,7 @@ async Task MainWork(string path) {
 		}
 		i++;
 	}
+	reader.Close();
 	Console.Clear();
 	Console.WriteLine($"{i} / {lines}\nGood: {good_c} | Shit: {shit_c}");
 	Console.Title = $"Working with {filename}. {i} / {lines} | Good: {good_c} | Shit: {shit_c}";
