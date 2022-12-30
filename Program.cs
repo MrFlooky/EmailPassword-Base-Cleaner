@@ -144,9 +144,6 @@ string ProcessLine(string line, List<string> baddns) {
 		mailpass[1] == mailpass[0])
 		return $"#PassIsLogin#";
 
-	if (logindomain[0].Contains("???"))
-		return $"#Questions#";
-
 	if (gmails.Contains(logindomain[1]) && logindomain[0].Contains("xxxx"))
 		return $"#GoogleXXXX#";
 
