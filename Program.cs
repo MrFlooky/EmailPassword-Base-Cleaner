@@ -1,6 +1,41 @@
-﻿using System.Text;
-using System.Text.RegularExpressions;
+﻿//using System.Text;
 using System.Net;
+using System.Text.RegularExpressions;
+
+bool check = false;
+if (!File.Exists("TempMails")) {
+	Console.WriteLine("\"TempMails\" file not found.");
+	check = true;
+}
+if (!File.Exists("GoodDNS")) {
+	Console.WriteLine("\"GoodDNS\" file not found.");
+	check = true;
+}
+if (!File.Exists("FixZone")) {
+	Console.WriteLine("\"FixZone\" file not found.");
+	check = true;
+}
+if (!File.Exists("FixDomains")) {
+	Console.WriteLine("\"FixDomains\" file not found.");
+	check = true;
+}
+if (!File.Exists("BigDomains")) {
+	Console.WriteLine("\"BigDomains\" file not found.");
+	check = true;
+}
+if (!File.Exists("BadMail")) {
+	Console.WriteLine("\"BadMail\" file not found.");
+	check = true;
+}
+if (!File.Exists("BadDomain")) {
+	Console.WriteLine("\"BadDomain\" file not found.");
+	check = true;
+}
+if (!File.Exists("BadDNS")) {
+	Console.WriteLine("\"BadDNS\" file not found.");
+	check = true;
+}
+if (check) Environment.Exit(0);
 
 string? tmpline;
 List<string> tempdomains = new();
@@ -8,18 +43,26 @@ using StreamReader reader = new("TempMails");
 while ((tmpline = reader.ReadLine()) != null)
 	tempdomains.Add(tmpline);
 reader.Close();
-List<string> baddomains = new();
-using StreamReader reader1 = new("BadDomain");
+List<string> gooddomains = new();
+using StreamReader reader1 = new("GoodDNS");
 while ((tmpline = reader1.ReadLine()) != null)
-	baddomains.Add(tmpline);
+	gooddomains.Add(tmpline);
 reader1.Close();
-
+List<string> fixdomains = new();
+using StreamReader reader2 = new("FixDomains");
+while ((tmpline = reader2.ReadLine()) != null)
+	fixdomains.Add(tmpline);
+reader2.Close();
+List<string> fixzones = new();
+using StreamReader reader3 = new("FixZone");
+while ((tmpline = reader3.ReadLine()) != null)
+	fixzones.Add(tmpline);
+reader3.Close();
 int GetLinesCount(string path) {
 	int i = 0;
-	using (StreamReader sr = new(path)) {
+	using (StreamReader sr = new(path))
 		while (sr.ReadLine() != null)
 			i++;
-	}
 	return i;
 }
 
@@ -80,7 +123,7 @@ async Task<List<string>> DNSCheck(string path) {
 			Console.WriteLine($"Checking DNS addresses.\nAdding {i} domain to list.");
 			Console.Title = $"Checking DNS addresses. Adding {i} domain to list.";
 		}
-		if (domainRegex().IsMatch(line) && !domains.Contains(domainRegex().Match(line).Groups[1].Value) && !bigdomains.Contains(domain1Regex().Match(line).Groups[1].Value))
+		if (domainRegex().IsMatch(line) && !domains.Contains(domainRegex().Match(line).Groups[1].Value) && !bigdomains.Contains(domain1Regex().Match(line).Groups[1].Value) && !gooddomains.Contains(domain1Regex().Match(line).Groups[1].Value))
 			domains.Add(domainRegex().Match(line).Groups[1].Value.ToLower());
 		i++;
 	}
@@ -96,13 +139,17 @@ async Task<List<string>> DNSCheck(string path) {
 			Console.WriteLine($"Checking DNS addresses.\nChecking TXT of {i} / {max}.");
 			Console.Title = $"Checking DNS addresses. Checking TXT of {i} / {max}.";
 		}
-		if (!baddns.Contains(domains[i]) && !tempdomains.Contains(domains[i])) {
+		if (!baddns.Contains(domains[i]) && !tempdomains.Contains(domains[i]) && !gooddomains.Contains(domains[i])) {
 			try {
 				CancellationTokenSource tokenSource = new(TimeSpan.FromSeconds(1));
 				var txtRecords = await Dns.GetHostEntryAsync(domains[i], tokenSource.Token);
 				if (txtRecords.AddressList.Length == 0) {
 					baddns.Add(domains[i]);
 					File.AppendAllText("BadDNS", $"{domains[i]}\r\n");
+				}
+				else {
+					gooddomains.Add(domains[i]);
+					File.AppendAllText("GoodDNS", $"{domains[i]}\r\n");
 				}
 			}
 			catch (Exception) {
@@ -116,6 +163,28 @@ async Task<List<string>> DNSCheck(string path) {
 	return baddns;
 }
 
+string ZoneFix(string line) {
+	string line1 = "";
+	for (int i = 1; i < line.Split('.').Length; i++)
+		line1 += $".{line.Split('.')[i]}";
+	foreach (string zone in fixzones)
+		if (Regex.IsMatch(line1, zone.Split('=')[0])) {
+			line1 = line1.Replace(line1, zone.Split('=')[1]);
+			break;
+		}
+	return line1;
+}
+
+string DomainFix(string line) {
+	foreach (string domain in fixdomains) {
+		if (line.Contains(domain.Split('=')[0])) {
+			line = line.Replace($"{line.Split('.')[0]}.", domain.Split('=')[1]);
+			break;
+		}
+	}
+	return line.Split('.')[0] + ZoneFix(line);
+}
+
 string ProcessLine(string line, List<string> baddns) {
 	string[] gmails = new string[2] { "googlemail.com", "gmail.com" };
 	string[] yandexs = new string[6] { "ya.ru", "yandex.com", "yandex.ru", "yandex.by", "yandex.kz", "yandex.ua" };
@@ -124,18 +193,18 @@ string ProcessLine(string line, List<string> baddns) {
 
 	if (!loginpassRegex().IsMatch(line))
 		return $"#BadSyntax#";
-	
+
 	string[] mailpass = line.Split(":");
-	
+
 	//PASS CHECK
-	
+
 	if (mailpass[1] == "")
 		return $"#EmptyPass#";
-	
+
 	string[] logindomain = mailpass[0].ToLower().Split("@");
 
 	//EMAIL CHECK
-	
+
 	if (line.Contains("xrum"))
 		return $"#Xrumer#";
 
@@ -149,9 +218,8 @@ string ProcessLine(string line, List<string> baddns) {
 
 	if (tempdomains.Contains(logindomain[1]))
 		return $"#TempMail#";
-	
-	if (baddomains.Contains(logindomain[1]))
-		return $"#BadDomain#";
+
+	//DOMAIN FIX
 
 	if (baddns.Contains(logindomain[1]))
 		return $"#BadDNS#";
@@ -161,14 +229,14 @@ string ProcessLine(string line, List<string> baddns) {
 	if (htmlencodeRegex().Matches(line).Count > 0)
 		line = WebUtility.HtmlDecode(line);
 
-	//EMAIL FIX
+	//LOGIN FIX
 
 	if (logindomain[0].Contains('+'))
 		logindomain[0] = logindomain[0].Split('+')[0];
 
 	if (gmails.Contains(logindomain[1]) && logindomain[0].Contains('.'))
 		logindomain[0] = logindomain[0].Replace(".", "");
-	
+
 	if (yandexs.Contains(logindomain[1]) && logindomain[0].Contains('.'))
 		logindomain[0] = logindomain[0].Replace(".", "-");
 
@@ -187,17 +255,27 @@ string ProcessLine(string line, List<string> baddns) {
 }
 
 async Task MainWork(string path) {
-	List<string> baddns = await DNSCheck(path);
 	string? line, result, filename = Path.GetFileNameWithoutExtension(path);
 	int i = 0, shit_c = 0, good_c = 0, lines = GetLinesCount(path);
 	if (File.Exists($"{filename}_shit.txt")) File.Delete($"{filename}_shit.txt");
 	if (File.Exists($"{filename}_shit.tmp")) File.Delete($"{filename}_shit.tmp");
 	if (File.Exists($"{filename}_good.txt")) File.Delete($"{filename}_good.txt");
 	if (File.Exists($"{filename}_good.tmp")) File.Delete($"{filename}_good.tmp");
+	if (File.Exists($"{filename}.txt")) File.Delete($"{filename}.txt");
+	Console.WriteLine("Working.\nFixing domains and writing to temp file.");
+	Console.Title = "Fixing domains and writing to temp file";
+	using StreamReader reader1 = new(path);
+	while ((line = reader1.ReadLine()) != null)
+		if (loginpassRegex().IsMatch(line)) {
+			line = $"{line.Split(':')[0].Split('@')[0]}@{DomainFix(line.Split(':')[0].Split('@')[1])}:{line.Split(':')[1]}";
+			File.AppendAllText($"{filename}.txt", $"{line}\r\n");
+		}
+	reader1.Close();
+	List<string> baddns = await DNSCheck($"{filename}.txt");
 	Console.Clear();
 	Console.WriteLine($"{i} / {lines}\nGood: {good_c} | Shit: {shit_c}");
 	Console.Title = $"Working with {filename}. {i} / {lines} | Good: {good_c} | Shit: {shit_c}";
-	using StreamReader reader = new(path);
+	using StreamReader reader = new($"{filename}.txt");
 	while ((line = reader.ReadLine()) != null) {
 		if (i % 2000 == 0) {
 			if (i % 10000 == 0)
@@ -218,6 +296,7 @@ async Task MainWork(string path) {
 		i++;
 	}
 	reader.Close();
+	File.Delete($"{filename}.txt");
 	Console.Clear();
 	Console.WriteLine($"{i} / {lines}\nGood: {good_c} | Shit: {shit_c}");
 	Console.Title = $"Working with {filename}. {i} / {lines} | Good: {good_c} | Shit: {shit_c}";
@@ -228,9 +307,8 @@ async Task MainWork(string path) {
 
 while (true) {
 	Console.Title = "Idle.";
-	Console.Clear();
 	Console.WriteLine("Drop a file here: ");
-	string? path = Console.ReadLine();
+	string? path = Console.ReadLine().Replace("\"", "");
 	Console.Clear();
 	if (pathRegex().IsMatch(path) && File.Exists(path)) {
 		MainWork(path).Wait();
@@ -243,13 +321,14 @@ while (true) {
 	path = Console.ReadLine();
 	if (path == "y" || path == "Y")
 		break;
+	else Console.Clear();
 }
 
 partial class Program {
 	[GeneratedRegex(@"^[A-Za-z]:(?:\\[^\\\/:*?""<>\|]+)*\\[^\\\/:*?""<>\|]+\.txt$")]
 	private static partial Regex pathRegex();
-	
-	[GeneratedRegex(@"^[\w\.\+-]+@([A-z\d-]+\.)+[A-z\d]{2,11}:.*?$")]
+
+	[GeneratedRegex(@"^(?:[a-z\d!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z\d!#$%&'*+/=?^_`{|}~-]+)*|""(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21\x23-\x5b\x5d-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])*"")@(?:[a-z\d](?:[a-z\d-]*[a-z\d])?\.)+[a-z\d](?:[a-z\d-]*[a-z\d])?|\[(?:(?:(2(5[0-5]|[0-4]\d)|1\d\d|[1-9]?\d))\.){3}(?:(2(5[0-5]|[0-4]\d)|1\d\d|[1-9]?\d)|[a-z\d-]*[a-z\d]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\]:.*?$")]
 	private static partial Regex loginpassRegex();
 
 	[GeneratedRegex(@"^#\w+#$")]
@@ -258,12 +337,12 @@ partial class Program {
 	[GeneratedRegex(@"^(?:[A-z\d+/]{4})*(?:[A-z\d+/]{2}==|[A-z\d+/]{3}=)?$")]
 	private static partial Regex base64Regex();
 
-	[GeneratedRegex(@"&[A-z\d]{2,6};")]
+	[GeneratedRegex(@"&[A-Za-z\d]{2,6};")]
 	private static partial Regex htmlencodeRegex();
 
-	[GeneratedRegex(@"@([\w-]+(?:\.[\w-]+)+):")]
+	[GeneratedRegex(@"@(?:[a-z\d](?:[a-z\d-]*[a-z\d])?\.)+[a-z\d](?:[a-z\d-]*[a-z\d])?|\[(?:(?:(2(5[0-5]|[0-4]\d)|1\d\d|[1-9]?\d))\.){3}(?:(2(5[0-5]|[0-4]\d)|1\d\d|[1-9]?\d)|[a-z\d-]*[a-z\d]:(?:[\x01-\x08\x0b\x0c\x0e-\x1f\x21-\x5a\x53-\x7f]|\\[\x01-\x09\x0b\x0c\x0e-\x7f])+)\]:")]
 	private static partial Regex domainRegex();
 
-	[GeneratedRegex(@"@([\w-]+)\..*?:")]
+	[GeneratedRegex(@"@([a-z\d](?:[a-z\d-]*[a-z\d])?)\..*?:")]
 	private static partial Regex domain1Regex();
 }
