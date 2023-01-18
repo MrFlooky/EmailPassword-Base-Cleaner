@@ -1,15 +1,22 @@
 ﻿//using System.Text;
 using System.Net;
-using System.Net.Http.Headers;
 using System.Text.RegularExpressions;
 
 bool check = false;
-if (!File.Exists("TempMails")) {
-	Console.WriteLine("\"TempMails\" file not found.");
-	check = true;
-}
 if (!File.Exists("GoodDNS")) {
 	Console.WriteLine("\"GoodDNS\" file not found.");
+	check = true;
+}
+if (!File.Exists("BadDNS")) {
+	Console.WriteLine("\"BadDNS\" file not found.");
+	check = true;
+}
+if (!File.Exists("BadMail")) {
+	Console.WriteLine("\"BadMail\" file not found.");
+	check = true;
+}
+if (!File.Exists("TempMails")) {
+	Console.WriteLine("\"TempMails\" file not found.");
 	check = true;
 }
 if (!File.Exists("FixZone")) {
@@ -22,14 +29,6 @@ if (!File.Exists("FixDomains")) {
 }
 if (!File.Exists("BigDomains")) {
 	Console.WriteLine("\"BigDomains\" file not found.");
-	check = true;
-}
-if (!File.Exists("BadMail")) {
-	Console.WriteLine("\"BadMail\" file not found.");
-	check = true;
-}
-if (!File.Exists("BadDNS")) {
-	Console.WriteLine("\"BadDNS\" file not found.");
 	check = true;
 }
 if (check) {
@@ -183,11 +182,6 @@ string DomainFix(string line, List<string> fixdomains, List<string> fixzones) {
 }
 
 string ProcessLine(string line, List<string> baddns, List<string> tempdomains) {
-	//EMAIL REGEX CHECK
-
-	if (!loginpassRegex().IsMatch(line))
-		return $"#BadSyntax#";
-
 	string[] mailpass = line.Split(":");
 
 	//PASS CHECK
@@ -246,7 +240,12 @@ string ProcessLine(string line, List<string> baddns, List<string> tempdomains) {
 	//if (base64Regex().IsMatch(mailpass[1]))
 	//	mailpass[1] = Encoding.UTF8.GetString(Convert.FromBase64String(mailpass[1]));
 
-	return $"{logindomain[0]}@{logindomain[1]}:{mailpass[1]}";
+	string result = $"{logindomain[0]}@{logindomain[1]}:{mailpass[1]}";
+	if (mailpass.Length > 2)
+		foreach (string piece in mailpass.Skip(2))
+			result += $":{piece}";
+
+	return result;
 }
 
 async Task MainWork(string path, List<string> tempdomains, List<string> fixzones, List<string> fixdomains) {
@@ -266,14 +265,25 @@ async Task MainWork(string path, List<string> tempdomains, List<string> fixzones
 		}
 		try {
 			if (loginpassRegex().IsMatch(line)) {
-				line = $"{line.Split(':')[0].Split('@')[0]}@{DomainFix(line.Split(':')[0].Split('@')[1], fixdomains, fixzones)}:{line.Split(':')[1]}";
-				File.AppendAllText($"{filename}.txt", $"{line}\r\n");
+				string templine = $"{line.Split(':')[0].Split('@')[0]}@{DomainFix(line.Split(':')[0].Split('@')[1], fixdomains, fixzones)}";
+				if (line.Split(':').Length >= 2)
+					foreach (string piece in line.Split(':').Skip(1))
+						templine += $":{piece}";
+				File.AppendAllText($"{filename}.txt", $"{templine}\r\n");
 			}
+			else
+				File.AppendAllText($"{filename}_shit.tmp", $"#BadSyntax# {line}\r\n");
 		}
 		catch (Exception) {}
 		i++;
 	}
 	reader1.Close();
+	if (!File.Exists($"{filename}.txt")) {
+		Console.Clear();
+		Console.Title = $"Idle.";
+		Console.WriteLine("No good mail:pass(:other) lines found!");
+		return;
+	}
 	Console.Clear();
 	Console.WriteLine($"Working.\nFixing domains and writing to temp file.\n{i} / {lines}");
 	Console.Title = $"{Math.Round((float)i / (float)lines * 100, 2)}% | {i} / {lines} | Fixing domains and writing to temp file";
@@ -294,7 +304,7 @@ async Task MainWork(string path, List<string> tempdomains, List<string> fixzones
 			Console.Title = $"{Math.Round((float)i / lines * 100, 2)}% | {i} / {lines} | {filename} | Good / Shit: {good_c} / {shit_c}";
 		}
 		result = ProcessLine(line, baddns, tempdomains);
-		if (shitRegex().IsMatch(result)) {
+		if (Regex.IsMatch(result, @"^#\w+#$")) {
 			File.AppendAllText($"{filename}_shit.tmp", $"{result} {line}\r\n");
 			shit_c++;
 		}
@@ -358,14 +368,11 @@ partial class Program {
 	[GeneratedRegex(@"^[A-Za-z]:(?:\\[^\\\/:*?""<>\|]+)*\\[^\\\/:*?""<>\|]+\.txt$")]
 	private static partial Regex pathRegex();
 
-	[GeneratedRegex(@"^[\w\.\+-]+@([A-z\d-]+\.)+[A-z\d]{2,11}:.*?$")]
+	[GeneratedRegex(@"^[^._+-][\w\.\+-]+@([A-z\d-]+\.)+[A-z\d]{2,11}:.*?$")]
 	private static partial Regex loginpassRegex();
 
-	[GeneratedRegex(@"^#\w+#$")]
-	private static partial Regex shitRegex();
-
-	[GeneratedRegex(@"^(?:[A-z\d+/]{4})*(?:[A-z\d+/]{2}==|[A-z\d+/]{3}=)?$")]
-	private static partial Regex base64Regex();
+	//[GeneratedRegex(@"^(?:[A-z\d+/]{4})*(?:[A-z\d+/]{2}==|[A-z\d+/]{3}=)?$")]
+	//private static partial Regex base64Regex();
 
 	[GeneratedRegex(@"&[A-Za-z\d]{2,6};")]
 	private static partial Regex htmlencodeRegex();
