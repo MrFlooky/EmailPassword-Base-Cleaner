@@ -78,6 +78,7 @@ void SetConfig(string msg) {
 bool CheckConfig() {
 	if (!File.Exists("config.cfg")) {
 		SetConfig("Config file not found.");
+		Console.Clear();
 		return false;
 	}
 	else
@@ -92,10 +93,10 @@ bool CheckConfig() {
 			config.fixdotsgmail = bool.Parse(lines[6].Split(": ")[1]);
 			config.fixdotsyandex = bool.Parse(lines[7].Split(": ")[1]);
 			config.fixplus = bool.Parse(lines[8].Split(": ")[1]);
-			return false;
 		}
 		catch {
 			SetConfig("Config file is corrupted.");
+			Console.Clear();
 			return false;
 		}
 	return true;
@@ -411,7 +412,6 @@ while (true) {
 	while ((tmpline = reader4.ReadLine()) != null)
 		tempdomains.Add(tmpline);
 	reader4.Close();
-	Console.Clear();
 	Console.Title = "Idle.";
 	if (CheckConfig()) {
 		Console.WriteLine("Do you want to change config? y / n: ");
@@ -421,6 +421,7 @@ while (true) {
 				switch (tmpline) {
 					case "y":
 						SetConfig("Changing config file.");
+						Console.Clear();
 						break;
 					case "n":
 						break;
