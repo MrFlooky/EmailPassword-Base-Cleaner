@@ -75,6 +75,29 @@ void SetConfig(string msg) {
 	File.WriteAllText("config.cfg", write);
 }
 
+bool CheckConfig() {
+	if (!File.Exists("config.cfg"))
+		SetConfig("Config file not found.");
+	else
+		try {
+			string[] lines = File.ReadAllLines("config.cfg");
+			config.checkdns = bool.Parse(lines[0].Split(": ")[1]);
+			config.removexxxx = bool.Parse(lines[1].Split(": ")[1]);
+			config.removeemptypass = bool.Parse(lines[2].Split(": ")[1]);
+			config.removexrumer = bool.Parse(lines[3].Split(": ")[1]);
+			config.removeequalloginpass = bool.Parse(lines[4].Split(": ")[1]);
+			config.removetempmail = bool.Parse(lines[5].Split(": ")[1]);
+			config.fixdotsgmail = bool.Parse(lines[6].Split(": ")[1]);
+			config.fixdotsyandex = bool.Parse(lines[7].Split(": ")[1]);
+			config.fixplus = bool.Parse(lines[8].Split(": ")[1]);
+			return false;
+		}
+		catch {
+			SetConfig("Config file is corrupted.");
+		}
+	return true;
+}
+
 int GetLinesCount(string path) {
 	int i = 0;
 	using (StreamReader sr = new(path))
@@ -385,40 +408,24 @@ while (true) {
 	while ((tmpline = reader4.ReadLine()) != null)
 		tempdomains.Add(tmpline);
 	reader4.Close();
-
-	if (!File.Exists("config.cfg"))
-		SetConfig("Config file not found.");
-	else
-		try {
-			string[] lines = File.ReadAllLines("config.cfg");
-			config.checkdns = bool.Parse(lines[0].Split(": ")[1]);
-			config.removexxxx = bool.Parse(lines[1].Split(": ")[1]);
-			config.removeemptypass = bool.Parse(lines[2].Split(": ")[1]);
-			config.removexrumer = bool.Parse(lines[3].Split(": ")[1]);
-			config.removeequalloginpass = bool.Parse(lines[4].Split(": ")[1]);
-			config.removetempmail = bool.Parse(lines[5].Split(": ")[1]);
-			config.fixdotsgmail = bool.Parse(lines[6].Split(": ")[1]);
-			config.fixdotsyandex = bool.Parse(lines[7].Split(": ")[1]);
-			config.fixplus = bool.Parse(lines[8].Split(": ")[1]);
-		}
-		catch {
-			SetConfig("Config file is corrupted.");
-		}
+	Console.Clear();
 	Console.Title = "Idle.";
-	Console.WriteLine("Do you want to change config? y / n: ");
-	while (true) {
-		tmpline = Console.ReadLine();
-		if (Regex.IsMatch(tmpline, "^[yn]$")) {
-			switch (tmpline) {
-				case "y":
-					SetConfig("Changing config file.");
-					break;
-				case "n":
-					break;
+	if (CheckConfig()) {
+		Console.WriteLine("Do you want to change config? y / n: ");
+		while (true) {
+			tmpline = Console.ReadLine();
+			if (Regex.IsMatch(tmpline, "^[yn]$")) {
+				switch (tmpline) {
+					case "y":
+						SetConfig("Changing config file.");
+						break;
+					case "n":
+						break;
+				}
+				break;
 			}
-			break;
+			else Console.WriteLine("Try again.");
 		}
-		else Console.WriteLine("Try again.");
 	}
 	tmpline = null;
 	Console.WriteLine("Drop a file here: ");
