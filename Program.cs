@@ -37,6 +37,43 @@ if (check) {
 }
 string[] gmails = new string[2] { "googlemail.com", "gmail.com" };
 string[] yandexs = new string[6] { "ya.ru", "yandex.com", "yandex.ru", "yandex.by", "yandex.kz", "yandex.ua" };
+Config config = new();
+
+bool SetPartConfig(string msg) {
+	string temp;
+	bool tempb;
+	while (true) {
+		Console.WriteLine(msg);
+		temp = Console.ReadLine();
+		if (Regex.IsMatch(temp, "^[yn]$")) {
+			tempb = temp == "y";
+			break;
+		}
+		else Console.WriteLine("Invalid input, try again.");
+	}
+	return tempb;
+}
+
+void SetConfig(string msg) {
+	Console.WriteLine(msg);
+	Console.WriteLine("Note: If all answers is \"n\", program will fix only syntax errors.");
+	config.checkdns = SetPartConfig("Check DNS of domains in emails? y / n");
+	config.removexxxx = SetPartConfig("Remove \"xxxx\" in google mails? y / n");
+	config.removeemptypass = SetPartConfig("Remove empty passwords? y / n");
+	config.removexrumer = SetPartConfig("Remove xrumer (spam) mails? y / n");
+	config.removeequalloginpass = SetPartConfig("Remove same login and pass? y / n");
+	config.removetempmail = SetPartConfig("Remove temp mails? y / n");
+	config.fixdotsgmail = SetPartConfig("Remove dots in google mails? y / n");
+	config.fixdotsyandex = SetPartConfig("Replace dots to \"-\" in yandex mails? y / n");
+	config.fixplus = SetPartConfig("Remove all after \"+\" in mails? y / n");
+	
+	string write = $"Check DNS: {config.checkdns}\nRemoveXXXX: {config.removexxxx}\n" +
+		$"RemoveEmptyPass: {config.removeemptypass}\nRemoveXrumer: {config.removexrumer}\n" +
+		$"RemoveEqualLoginPass: {config.removeequalloginpass}\nRemoveTempMail: {config.removetempmail}\n" +
+		$"FixDotsGmail: {config.fixdotsgmail}\nFixDotsYandex: {config.fixdotsyandex}\n" +
+		$"FixPlus: {config.fixplus}";
+	File.WriteAllText("config.cfg", write);
+}
 
 int GetLinesCount(string path) {
 	int i = 0;
@@ -186,31 +223,33 @@ string ProcessLine(string line, List<string> baddns, List<string> tempdomains) {
 
 	//PASS CHECK
 
-	if (mailpass[1] == "")
+	if (config.removeemptypass && mailpass[1] == "")
 		return $"#EmptyPass#";
 
 	string[] logindomain = mailpass[0].ToLower().Split("@");
 
 	//EMAIL CHECK
 
-	if (line.Contains("xrum"))
+	if (config.removexrumer && line.Contains("xrum"))
 		return $"#Xrumer#";
 
-	if (mailpass[1] == logindomain[0] ||
+	if (config.removeequalloginpass &&
+		mailpass[1] == logindomain[0] ||
 		mailpass[1] == logindomain[1] ||
 		mailpass[1] == mailpass[0] ||
 		mailpass[1] == $"{logindomain[0]}@{logindomain[1].Split('.')[0]}")
 		return $"#PassIsLogin#";
 
-	if (gmails.Contains(logindomain[1]) && logindomain[0].Contains("xxxx"))
+	if (config.removexxxx &&
+		gmails.Contains(logindomain[1]) && logindomain[0].Contains("xxxx"))
 		return $"#GoogleXXXX#";
 
-	if (tempdomains.Contains(logindomain[1]))
+	if (config.removetempmail && tempdomains.Contains(logindomain[1]))
 		return $"#TempMail#";
 
 	//DOMAIN FIX
 
-	if (baddns.Contains(logindomain[1]))
+	if (config.checkdns && baddns.Contains(logindomain[1]))
 		return $"#BadDNS#";
 
 	//ALL LINE FIX
@@ -220,13 +259,13 @@ string ProcessLine(string line, List<string> baddns, List<string> tempdomains) {
 
 	//LOGIN FIX
 
-	if (logindomain[0].Contains('+'))
+	if (config.fixplus && logindomain[0].Contains('+'))
 		logindomain[0] = logindomain[0].Split('+')[0];
 
-	if (gmails.Contains(logindomain[1]) && logindomain[0].Contains('.'))
+	if (config.fixdotsgmail && gmails.Contains(logindomain[1]) && logindomain[0].Contains('.'))
 		logindomain[0] = logindomain[0].Replace(".", "");
 
-	if (yandexs.Contains(logindomain[1]) && logindomain[0].Contains('.'))
+	if (config.fixdotsyandex && yandexs.Contains(logindomain[1]) && logindomain[0].Contains('.'))
 		logindomain[0] = logindomain[0].Replace(".", "-");
 
 	//PASS FIX
@@ -328,6 +367,7 @@ async Task MainWork(string path, List<string> tempdomains, List<string> fixzones
 }
 
 Console.WriteLine("Created for @SilverBulletRU");
+
 while (true) {
 	string? tmpline;
 	List<string> fixdomains = new();
@@ -346,21 +386,53 @@ while (true) {
 		tempdomains.Add(tmpline);
 	reader4.Close();
 
+	if (!File.Exists("config.cfg"))
+		SetConfig("Config file not found.");
+	else
+		try {
+			string[] lines = File.ReadAllLines("config.cfg");
+			config.checkdns = bool.Parse(lines[0].Split(": ")[1]);
+			config.removexxxx = bool.Parse(lines[1].Split(": ")[1]);
+			config.removeemptypass = bool.Parse(lines[2].Split(": ")[1]);
+			config.removexrumer = bool.Parse(lines[3].Split(": ")[1]);
+			config.removeequalloginpass = bool.Parse(lines[4].Split(": ")[1]);
+			config.removetempmail = bool.Parse(lines[5].Split(": ")[1]);
+			config.fixdotsgmail = bool.Parse(lines[6].Split(": ")[1]);
+			config.fixdotsyandex = bool.Parse(lines[7].Split(": ")[1]);
+			config.fixplus = bool.Parse(lines[8].Split(": ")[1]);
+		}
+		catch {
+			SetConfig("Config file is corrupted.");
+		}
 	Console.Title = "Idle.";
+	Console.WriteLine("Do you want to change config? y / n: ");
+	while (true) {
+		tmpline = Console.ReadLine();
+		if (Regex.IsMatch(tmpline, "^[yn]$")) {
+			switch (tmpline) {
+				case "y":
+					SetConfig("Changing config file.");
+					break;
+				case "n":
+					break;
+			}
+			break;
+		}
+		else Console.WriteLine("Try again.");
+	}
+	tmpline = null;
 	Console.WriteLine("Drop a file here: ");
 	string? path = Console.ReadLine().Replace("\"", "");
 	Console.Clear();
-	if (pathRegex().IsMatch(path) && File.Exists(path)) {
+	if (pathRegex().IsMatch(path) && File.Exists(path))
 		MainWork(path, tempdomains, fixzones, fixdomains).Wait();
-	}
 	else {
 		Console.WriteLine("Drop valid .txt file that exists.");
 		continue;
 	}
 	Console.WriteLine("Do you want to exit? ( y / n ): ");
 	path = Console.ReadLine();
-	if (path == "y" || path == "Y")
-		break;
+	if (path == "y" || path == "Y") break;
 	else Console.Clear();
 }
 
@@ -382,4 +454,16 @@ partial class Program {
 
 	[GeneratedRegex(@"@([\w-]+)\..*?:")]
 	private static partial Regex domain1Regex();
+}
+
+class Config {
+	public bool checkdns = true;
+	public bool removexxxx = true;
+	public bool removeemptypass = true;
+	public bool removexrumer = true;
+	public bool removeequalloginpass = true;
+	public bool removetempmail = true;
+	public bool fixdotsgmail = true;
+	public bool fixdotsyandex = true;
+	public bool fixplus = true;
 }
