@@ -76,8 +76,10 @@ void SetConfig(string msg) {
 }
 
 bool CheckConfig() {
-	if (!File.Exists("config.cfg"))
+	if (!File.Exists("config.cfg")) {
 		SetConfig("Config file not found.");
+		return false;
+	}
 	else
 		try {
 			string[] lines = File.ReadAllLines("config.cfg");
@@ -94,6 +96,7 @@ bool CheckConfig() {
 		}
 		catch {
 			SetConfig("Config file is corrupted.");
+			return false;
 		}
 	return true;
 }
