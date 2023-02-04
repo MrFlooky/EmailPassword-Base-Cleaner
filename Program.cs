@@ -3,34 +3,12 @@ using System.Text;
 using System.Text.RegularExpressions;
 
 bool check = false;
-if (!File.Exists("GoodDNS")) {
-	Console.WriteLine("\"GoodDNS\" file not found.");
-	check = true;
-}
-if (!File.Exists("BadDNS")) {
-	Console.WriteLine("\"BadDNS\" file not found.");
-	check = true;
-}
-if (!File.Exists("BadMail")) {
-	Console.WriteLine("\"BadMail\" file not found.");
-	check = true;
-}
-if (!File.Exists("TempMails")) {
-	Console.WriteLine("\"TempMails\" file not found.");
-	check = true;
-}
-if (!File.Exists("FixZone")) {
-	Console.WriteLine("\"FixZone\" file not found.");
-	check = true;
-}
-if (!File.Exists("FixDomains")) {
-	Console.WriteLine("\"FixDomains\" file not found.");
-	check = true;
-}
-if (!File.Exists("BigDomains")) {
-	Console.WriteLine("\"BigDomains\" file not found.");
-	check = true;
-}
+string[] files = new string[5] { "BadDNS", "FixDomains", "FixZone", "GoodDNS", "TempMails" };
+foreach (string file in files)
+	if (!File.Exists(file)) {
+		Console.WriteLine($"\"{file}\" file not found.");
+		if (!check) check = true;
+	}
 if (check) {
 	Console.ReadLine();
 	Environment.Exit(0);
@@ -117,6 +95,21 @@ bool CheckConfig() {
 	return true;
 }
 
+void PromptConfig() {
+	Console.WriteLine("Do you want to change config? y / n: ");
+	while (true) {
+		tmpline = Console.ReadLine();
+		if (Regex.IsMatch(tmpline, "^[YynN]$")) {
+			if (tmpline == "y") {
+				SetConfig("Changing config file.");
+				Console.Clear();
+			}
+			break;
+		}
+		Console.WriteLine("Try again.");
+	}
+}
+
 int GetLinesCount(string path) {
 	int i = 0;
 	using (StreamReader sr = new(path))
@@ -126,27 +119,34 @@ int GetLinesCount(string path) {
 }
 
 async Task<int> TempToTxtAsync(string file) {
-    if (!File.Exists(file)) return 0;
-    int i = 0;
-    HashSet<string> lines = new();
-    List<string> tempList = new();
-    using (StreamReader reader = new(file)) {
-        string line;
-        while ((line = await reader.ReadLineAsync()) != null)
-            if (lines.Add(line)) {
-                tempList.Add(line);
-                i++;
-            }
-    }
-    tempList.Sort();
-    using (StreamWriter writer = new(file.Replace(".tmp", ".txt")))
-        foreach (string line in tempList)
-            await writer.WriteLineAsync(line);
-    tempList = null;
-    File.Delete(file);
-    return i;
+	if (!File.Exists(file)) return 0;
+	int i = 0;
+	using (StreamReader reader = new(file)) {
+		HashSet<string> lines = new();
+		List<string> tempList = new(), loginlist = new();
+		while (await reader.ReadLineAsync() is string line) {
+			if (!lines.Contains(line) || (!loginlist.Contains(line) && gmails.Any(line.Contains))) {
+				lines.Add(line);
+				tempList.Add(line);
+				loginlist.Add(line);
+				i++;
+			}
+		}
+		loginlist = null;
+		lines = null;
+		tempList.Sort();
+		Clean();
+		using StreamWriter writer = new(file.Replace(".tmp", ".txt"));
+		foreach (string line in tempList)
+			await writer.WriteLineAsync(line);
+		writer.Close();
+		tempList = null;
+		Clean();
+	}
+	//reader.Close();
+	File.Delete(file);
+	return i;
 }
-
 
 void Clean() {
 	GC.Collect();
@@ -161,89 +161,109 @@ string HexFix(string line) {
 		System.Globalization.NumberStyles.HexNumber)));
 }
 
-async Task<List<string>> DNSCheck(string path, int lines_c) {
-	List<string> domains = new();
-    List<string> baddns = ReadFile("BadDNS");
-    List<string> gooddomains = ReadFile("GoodDNS");
-    string? line;
+async Task<List<string>> DNSCheck(string path, int lines_c, List<string> tempdomains) {
+	List<string> bigdomains = new(), domains = new(), baddns = new();
+	using StreamReader reader1 = new("BigDomains");
+	string? tmpline;
+	while ((tmpline = reader1.ReadLine()) != null)
+		bigdomains.Add(tmpline);
+	reader1.Close();
+	using StreamReader reader2 = new("BadDNS");
+	while ((tmpline = reader2.ReadLine()) != null)
+		baddns.Add(tmpline);
+	reader2.Close();
+	List<string> gooddomains = new();
+	using StreamReader reader3 = new("GoodDNS");
+	while ((tmpline = reader3.ReadLine()) != null)
+		gooddomains.Add(tmpline);
+	reader3.Close();
+	string? line;
 	int i = 0;
+    Console.Title = $"{Math.Round((float)i / lines_c * 100, 0)}% | {i} / {lines_c} | Checking DNS addresses.";
 	using StreamReader reader = new(path);
 	while ((line = reader.ReadLine()) != null) {
-		if (i % 2000 == 0) {
-			Console.Clear();
-			Console.WriteLine($"Checking DNS addresses.\n{i} / {lines_c}");
-			Console.Title = $"{Math.Round((float)i / (float)lines_c * 100, 2)}% | {i} / {lines_c} | Checking DNS addresses.";
+		Match match = domainCheck.Match(line);
+		if (match.Success && !gooddns.Contains(match.Groups[1].Value.ToLower())) {
+			string domain = match.Groups[1].Value.ToLower();
+			if (!baddns.Contains(domain) && !tempdomains.Contains(domain))
+				domains.Add(domain);
+			if (Math.Round((float)i / lines_c * 100, 1) % 2 == 0 && (float)i / lines_c * 100 > 1)
+				Console.Title = $"{Math.Round((float)i / lines_c * 100, 0)}% | {i} / {lines_c} | Checking DNS addresses.";
+			i++;
 		}
-		if (domainRegex().IsMatch(line) && !bigdomains.Contains(domain1Regex().Match(line).Groups[1].Value) && !gooddomains.Contains(domainRegex().Match(line).Groups[1].Value) && !baddns.Contains(domainRegex().Match(line).Groups[1].Value) && !tempdomains.Contains(domainRegex().Match(line).Groups[1].Value))
-			domains.Add(domainRegex().Match(line).Groups[1].Value.ToLower());
-		i++;
 	}
 	reader.Close();
-	bigdomains = null;
-	gooddomains = null;
-	Clean();
+
+	gooddns = null;
 	if (domains.Count == 0) return baddns;
-	domains = domains.Distinct().ToList();
-	Console.Clear();
-	Console.WriteLine($"Checking DNS addresses.\nSorting.");
-	domains.Sort();
-	int max = domains.Count;
+	domains = domains.Distinct().ToHashSet();
+	Console.WriteLine($"[2.2] Sorting DNS addresses.");
+	List<string> sortedDomains = domains.ToList();
+	int max = sortedDomains.Count;
 	i = 0;
-	while (i < max) {
-		if (i % 10 == 0) {
-			Console.Clear();
-			Console.WriteLine($"Checking DNS addresses.\nChecking TXT of {i} / {max}.");
-			Console.Title = $"{Math.Round((float)i / max * 100, 2)}% | {i} / {max} | Checking DNS addresses. Checking TXT.";
-		}
-		if (domains[i] == "") {
-			i++;
-			continue;
-		}
-		try {
-			CancellationTokenSource tokenSource = new(TimeSpan.FromSeconds(1));
-			var txtRecords = await Dns.GetHostEntryAsync(domains[i], tokenSource.Token);
-			if (txtRecords.AddressList.Length == 0) {
-				baddns.Add(domains[i]);
-				File.AppendAllText("BadDNS", $"{domains[i]}\r\n");
+	List<List<string>> chunks = sortedDomains
+		.Select((domain, index) => new { domain, index })
+		.GroupBy(x => x.index / 10)
+		.Select(g => g.Select(x => x.domain).ToList())
+		.ToList();
+	List<Task<List<string>>> tasks = new();
+    Console.WriteLine($"[2.3] Checking DNS's TXT of domains.");
+    foreach (var chunk in chunks)
+		tasks.Add(Task.Run(async () => {
+			List<string> badDNSChunk = new();
+			foreach (string domain in chunk) {
+				++i;
+				if ((float)i / max * 1000000 % 2 == 0)
+					Console.Title = $"{Math.Round((float)i / max * 100, 0)}% | {i} / {max} | Checking TXT of DNS addresses.";
+				try {
+					CancellationTokenSource tokenSource = new(TimeSpan.FromSeconds(2));
+					var txtRecords = await Dns.GetHostEntryAsync(domain, tokenSource.Token);
+					if (txtRecords.AddressList.Length == 0)
+						badDNSChunk.Add(domain);
+					else
+						File.AppendAllText("GoodDNS", $"{domain}\r\n");
+				}
+				catch (Exception) {
+					badDNSChunk.Add(domain);
+				}
 			}
-			else
-				File.AppendAllText("GoodDNS", $"{domains[i]}\r\n");
+			return badDNSChunk;
+		}));
+	await Task.WhenAll(tasks);
+	foreach (var task in tasks) {
+		var taskResult = await task;
+		foreach (var domain in taskResult) {
+			baddns.Add(domain);
+			File.AppendAllText("BadDNS", $"{domain}\r\n");
 		}
-		catch (Exception) {
-			baddns.Add(domains[i]);
-			File.AppendAllText("BadDNS", $"{domains[i]}\r\n");
-		}
-		i++;
 	}
+	sortedDomains = null;
 	domains = null;
-	Clean();
 	return baddns;
 }
 
-string ZoneFix(string line) {
-    var lineParts = line.Split('.');
-    var sb = new StringBuilder();
-    for (int i = 1; i < lineParts.Length; i++)
-        sb.Append("." + lineParts[i]);
-    string line1 = sb.ToString();
-    foreach (string zone in fixzones)
-        if (Regex.IsMatch(line1, zone.Split('=')[0])) {
-            line1 = line1.Replace(line1, zone.Split('=')[1]);
-            break;
-        }
-    return line1;
+string ZoneFix(string line, List<string> fixzones) {
+	string line1 = "";
+	for (int i = 1; i < line.Split('.').Length; i++)
+		line1 += $".{line.Split('.')[i]}";
+	foreach (string zone in fixzones)
+		if (Regex.IsMatch(line1, zone.Split('=')[0])) {
+			line1 = line1.Replace(line1, zone.Split('=')[1]);
+			break;
+		}
+	return line1;
 }
 
-string DomainFix(string line) {
+string DomainFix(string line, List<string> fixdomains, List<string> fixzones) {
 	foreach (string domain in fixdomains)
 		if (line.Contains(domain.Split('=')[0])) {
 			line = line.Replace($"{line.Split('.')[0]}.", domain.Split('=')[1]);
 			break;
 		}
-	return line.Split('.')[0] + ZoneFix(line);
+	return line.Split('.')[0] + ZoneFix(line, fixzones);
 }
 
-string ProcessLine(string line, List<string> baddns) {
+string ProcessLine(string line, List<string> baddns, List<string> tempdomains) {
 	string[] mailpass = line.Split(":");
 
 	//PASS CHECK
@@ -315,11 +335,12 @@ string ProcessLine(string line, List<string> baddns) {
 async Task MainWork(string path) {
 	string? line, result, filename = Path.GetFileNameWithoutExtension(path);
 	int i = 0, shit_c = 0, good_c = 0, lines = GetLinesCount(path);
-    var extensions = new string[] { "_shit.txt", "_shit.tmp", "_good.txt", "_good.tmp", ".txt" };
-    foreach (var extension in extensions)
-        if (File.Exists($"{filename}{extension}"))
-            File.Delete($"{filename}{extension}");
-    using StreamReader reader1 = new(path);
+	if (File.Exists($"{filename}_shit.txt")) File.Delete($"{filename}_shit.txt");
+	if (File.Exists($"{filename}_shit.tmp")) File.Delete($"{filename}_shit.tmp");
+	if (File.Exists($"{filename}_good.txt")) File.Delete($"{filename}_good.txt");
+	if (File.Exists($"{filename}_good.tmp")) File.Delete($"{filename}_good.tmp");
+	if (File.Exists($"{filename}.txt")) File.Delete($"{filename}.txt");
+	using StreamReader reader1 = new(path);
 	while ((line = reader1.ReadLine()) != null) {
 		if (i % 5000 == 0) {
 			Console.Clear();
@@ -327,14 +348,14 @@ async Task MainWork(string path) {
 			Console.Title = $"{Math.Round((float)i / (float)lines * 100, 2)}% | {i} / {lines} | Fixing domains and writing to temp file";
 		}
 		try {
-            if (loginpassRegex().IsMatch(line)) {
-                var stringBuilder = new StringBuilder($"{line.Split(':')[0].Split('@')[0]}@{DomainFix(line.Split(':')[0].Split('@')[1])}");
-                if (line.Split(':').Length >= 2)
-                    foreach (string piece in line.Split(':').Skip(1))
-                        stringBuilder.Append($":{piece}");
-                File.AppendAllText($"{filename}.txt", $"{stringBuilder}\r\n");
-            }
-            else
+			if (loginpassRegex().IsMatch(line)) {
+				string templine = $"{line.Split(':')[0].Split('@')[0]}@{DomainFix(line.Split(':')[0].Split('@')[1], fixdomains, fixzones)}";
+				if (line.Split(':').Length >= 2)
+					foreach (string piece in line.Split(':').Skip(1))
+						templine += $":{piece}";
+				File.AppendAllText($"{filename}.txt", $"{templine}\r\n");
+			}
+			else
 				File.AppendAllText($"{filename}_shit.tmp", $"#BadSyntax# {line}\r\n");
 		}
 		catch (Exception) {}
@@ -347,11 +368,9 @@ async Task MainWork(string path) {
 		Console.WriteLine("No good mail:pass(:other) lines found!");
 		return;
 	}
-	Console.Clear();
-	Console.WriteLine($"Working.\nFixing domains and writing to temp file.\n{i} / {lines}");
-	Console.Title = $"{Math.Round((float)i / (float)lines * 100, 2)}% | {i} / {lines} | Fixing domains and writing to temp file";
+	Console.Title = $"{Math.Round((float)i / lines * 100, 0)}% | {i} / {lines} | Fixing domains and writing to temp file";
 	i = 0;
-	List<string> baddns = await DNSCheck($"{filename}.txt", lines);
+	List<string> baddns = await DNSCheck($"{filename}.txt", lines, tempdomains);
 	lines = GetLinesCount($"{filename}.txt");
 	Console.Clear();
 	Console.WriteLine($"{i} / {lines}\nGood: {good_c} | Shit: {shit_c} | % 0 / 0 %");
@@ -366,11 +385,16 @@ async Task MainWork(string path) {
 			Console.WriteLine($"{i} / {lines}\nGood: {good_c} | Shit: {shit_c} | % {Math.Round(((float)good_c / (float)i) * 100, 2)} / {Math.Round(((float)shit_c / (float)i) * 100, 2)} %");
 			Console.Title = $"{Math.Round((float)i / lines * 100, 2)}% | {i} / {lines} | {filename} | Good / Shit: {good_c} / {shit_c}";
 		}
-		result = ProcessLine(line, baddns);
-        File.AppendAllText(Regex.IsMatch(result, @"^#\w+#$") ? $"{filename}_shit.tmp" : $"{filename}_good.tmp", $"{result} {line}\r\n");
-        if (Regex.IsMatch(result, @"^#\w+#$")) shit_c++;
-        else good_c++;
-    }
+		result = ProcessLine(line, baddns, tempdomains);
+		if (Regex.IsMatch(result, @"^#\w+#$")) {
+			File.AppendAllText($"{filename}_shit.tmp", $"{result} {line}\r\n");
+			shit_c++;
+		}
+		else {
+			File.AppendAllText($"{filename}_good.tmp", $"{result}\r\n");
+			good_c++;
+		}
+	}
 	reader.Close();
 	Console.Clear();
 	Console.WriteLine($"{i} / {lines}\nGood: {good_c} | Shit: {shit_c} | % {Math.Round(((float)good_c / (float)i) * 100, 2)} / {Math.Round(((float)shit_c / (float)i) * 100, 2)} %");
@@ -379,25 +403,42 @@ async Task MainWork(string path) {
 	good_c = await TempToTxtAsync($"{filename}_good.tmp");
 	await TempToTxtAsync($"{filename}_shit.tmp");
 	shit_c = lines - good_c;
-	Console.Clear();
-	Console.WriteLine($"{i} / {lines}\nGood: {good_c} | Shit: {shit_c} | % {Math.Round(((float)good_c / (float)i) * 100, 2)} / {Math.Round(((float)shit_c / (float)i) * 100, 2)} %");
-	Console.Title = $"Working with {filename}. {i} / {lines} | Good: {good_c} | Shit: {shit_c}";
+	Console.WriteLine("Done!");
 	Console.Title = "Idle.";
 }
 
-Console.WriteLine("Created for @SilverBulletRU");
-
+Console.WriteLine("Created by @SilverBulletRU");
+bool checkcfg = false;
 while (true) {
 	string? tmpline;
+	List<string> fixdomains = new();
+	using StreamReader reader2 = new("FixDomains");
+	while ((tmpline = reader2.ReadLine()) != null)
+		fixdomains.Add(tmpline);
+	reader2.Close();
+	List<string> fixzones = new();
+	using StreamReader reader3 = new("FixZone");
+	while ((tmpline = reader3.ReadLine()) != null)
+		fixzones.Add(tmpline);
+	reader3.Close();
+	List<string> tempdomains = new();
+	using StreamReader reader4 = new("TempMails");
+	while ((tmpline = reader4.ReadLine()) != null)
+		tempdomains.Add(tmpline);
+	reader4.Close();
 	Console.Title = "Idle.";
 	if (CheckConfig()) {
 		Console.WriteLine("Do you want to change config? y / n: ");
 		while (true) {
 			tmpline = Console.ReadLine();
-			if (Regex.IsMatch(tmpline, "^[Yyn]$")) {
-				if (tmpline == "y" || tmpline == "Y") {
-					SetConfig("Changing config file.");
-					Console.Clear();
+			if (Regex.IsMatch(tmpline, "^[yn]$")) {
+				switch (tmpline) {
+					case "y":
+						SetConfig("Changing config file.");
+						Console.Clear();
+						break;
+					case "n":
+						break;
 				}
 				break;
 			}
@@ -424,7 +465,7 @@ partial class Program {
 	[GeneratedRegex(@"^[A-Za-z]:(?:\\[^\\\/:*?""<>\|]+)*\\[^\\\/:*?""<>\|]+\.txt$")]
 	private static partial Regex pathRegex();
 
-	[GeneratedRegex(@"^[^._+-][\w\.\+-]+@([A-z\d-]+\.)+[A-z\d]{2,11}:.*?$")]
+	[GeneratedRegex(@"^[A-Za-z\d][\w.+-]*@([A-Za-z\d][A-Za-z\d-]*\.)+[A-Za-z][A-Za-z\d]{1,10}:.*?$")]
 	private static partial Regex loginpassRegex();
 
 	//[GeneratedRegex(@"^(?:[A-z\d+/]{4})*(?:[A-z\d+/]{2}==|[A-z\d+/]{3}=)?$")]
@@ -435,9 +476,6 @@ partial class Program {
 
 	[GeneratedRegex(@"@([\w-]+(?:\.[\w-]+)+):")]
 	private static partial Regex domainRegex();
-
-	[GeneratedRegex(@"@([\w-]+)\..*?:")]
-	private static partial Regex domain1Regex();
 }
 
 class Config {
@@ -449,5 +487,5 @@ class Config {
 	public bool removetempmail = true;
 	public bool fixdotsgmail = true;
 	public bool fixdotsyandex = true;
-	public bool fixplus = true;
+    public bool fixplus = true;
 }
