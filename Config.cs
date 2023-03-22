@@ -28,42 +28,47 @@ namespace config {
 		public static bool removeTempMail = true;
 		public static bool removeXumer = true;
 		public static bool removeXXXX = true;
+
 		public static bool CheckConfig() {
 			if (!File.Exists("config.cfg")) {
 				SetConfig("Config file not found.");
 				Console.Clear();
 				return false;
 			}
-			else
+			else {
 				try {
-					string[] lines = File.ReadAllLines("config.cfg");
-					checkDNS = bool.Parse(lines[0].Split(": ")[1]);
-					removeXXXX = bool.Parse(lines[1].Split(": ")[1]);
-					removeEmptyPass = bool.Parse(lines[2].Split(": ")[1]);
-					removeXumer = bool.Parse(lines[3].Split(": ")[1]);
-					removeEqualLoginPass = bool.Parse(lines[4].Split(": ")[1]);
-					removeTempMail = bool.Parse(lines[5].Split(": ")[1]);
-					fixDotsGmail = bool.Parse(lines[6].Split(": ")[1]);
-					fixDotsYandex = bool.Parse(lines[7].Split(": ")[1]);
-					fixPlus = bool.Parse(lines[8].Split(": ")[1]);
-					fixDomains = bool.Parse(lines[9].Split(": ")[1]);
+					var settings = new Dictionary<string, bool>(); // create a dictionary to store the settings
+					foreach (string line in File.ReadLines("config.cfg")) { // loop through each line in the file
+						string[] parts = line.Split(": "); // split the line by ": "
+						string name = parts[0]; // get the setting name
+						bool value = bool.Parse(parts[1]); // get the setting value
+						settings[name] = value; // add or update the setting in the dictionary
+					}
+					checkDNS = settings["checkDNS"];
+					removeXXXX = settings["removeXXXX"];
+					removeEmptyPass = settings["removeEmptyPass"];
+					removeXumer = settings["removeXumer"];
+					removeEqualLoginPass = settings["removeEqualLoginPass"];
+					removeTempMail = settings["removeTempMail"];
+					fixDotsGmail = settings["fixDotsGmail"];
+					fixDotsYandex = settings["fixDotsYandex"];
+					fixPlus = settings["fixPlus"];
+					fixDomains = settings["fixDomains"];
 				}
 				catch {
 					SetConfig("Config file is corrupted.");
 					Console.Clear();
 					return false;
 				}
+			}
 			return true;
 		}
 
 		public static void CheckFiles(string[] files) {
-			bool check = false;
-			foreach (string file in files) {
-				if (File.Exists(file)) continue;
-				Console.WriteLine($"\"{file}\" file not found.");
-				if (!check) check = true;
-			}
-			if (check) {
+			if (files.Any(file => !File.Exists(file))) { // check if any file does not exist
+				foreach (string file in files) // loop through all files
+					if (!File.Exists(file)) // print only the ones that do not exist
+						Console.WriteLine($"\"{file}\" file not found.");
 				Console.ReadLine();
 				Environment.Exit(0);
 			}
@@ -74,7 +79,7 @@ namespace config {
 			Regex loginpassPartialRegex = new(@"[A-Za-z\d][\w.+-]*@(?:[A-Za-z\d][A-Za-z\d-]*\.)+[A-Za-z]?[A-Za-z\d]{1,10}[;:].*?(?:[;:]|$)");
 			Regex mailRegex = new(@"^[A-Za-z\d][\w.+-]*@([A-Za-z\d][A-Za-z\d-]*\.)+[A-Za-z]?[A-Za-z\d]{1,10}$");
 			ParallelOptions options = new() { MaxDegreeOfParallelism = Environment.ProcessorCount };
-			string? line, fileName = Path.GetFileNameWithoutExtension(path);
+			string fileName = Path.GetFileNameWithoutExtension(path);
 			float i = 0;
 			long lines = FileUtils.GetLinesCount(path);
 			string dateTime = DateTime.Now.ToString("dd.MM.yyyy HH;mm");
@@ -88,7 +93,7 @@ namespace config {
 					File.Delete(tmpFile);
 			Console.Clear();
 			ConsoleUtils.WriteColorized("\n[INFO] ", ConsoleColor.Red);
-			Console.WriteLine($"Working with file \"{fileName}\"");
+			Console.WriteLine($"Working with file \"{fileName}\". Loaded {lines} lines.");
 			ConsoleUtils.WriteColorized("[1] ", ConsoleColor.DarkYellow);
 			Console.WriteLine("Fixing domains and writing to temp file.");
 			double roundedCount = Math.Round((double)lines / 100);
@@ -96,38 +101,61 @@ namespace config {
 			stopWatch.Start();
 			StringBuilder tempGood = new(), tempBad = new();
 			object lockObj = new();
-			Parallel.ForEach(File.ReadLines(path), options, (line, state, index) => {
+
+            var fixDomains = FileUtils.WriteToDictionary("FixDomains");
+            var domains = new HashSet<string>();
+			foreach (var item in fixDomains)
+				domains.Add(item.Value);
+            var fixZones = FileUtils.WriteToDictionary("FixZone");
+            var zones = new HashSet<string>();
+            foreach (var item in fixZones)
+                zones.Add(item.Value);
+
+            Parallel.ForEach(File.ReadLines(path), options, (line, state, index) => {
 				if (index % roundedCount == 0)
 					Console.Title = $"[1] {Math.Round(index / roundedCount, 0)}% | Fixing domains.";
 				try {
-					line = FileUtils.FixLines(line);
+					line = FileUtils.FixLines(line, fixDomains, domains, fixZones, zones);
 					if (loginpassRegex.IsMatch(line) || mailRegex.IsMatch(line))
-						lock (lockObj)
+						lock (lockObj) {
 							tempGood.AppendLine(line);
+							if (tempGood.Length >= 20480) {
+								File.AppendAllText(allFiles[4], tempGood.ToString());
+								tempGood.Clear();
+							}
+						}
 					else {
 						Match match = loginpassPartialRegex.Match(line);
 						if (match.Success)
-							lock (lockObj)
+							lock (lockObj) {
 								tempGood.AppendLine(match.Value);
+								if (tempGood.Length >= 20480) {
+									File.AppendAllText(allFiles[4], tempGood.ToString());
+									tempGood.Clear();
+								}
+							}
 						else
-							lock (lockObj)
+							lock (lockObj) {
 								tempBad.AppendLine($"#BadSyntax# {line}");
-					}
-					if (tempGood.Length >= 20480) {
-						File.AppendAllText(allFiles[4], tempGood.ToString());
-						tempGood.Clear();
-					}
-					if (tempBad.Length >= 20480) {
-						File.AppendAllText(allFiles[0], tempBad.ToString());
-						tempBad.Clear();
+								if (tempBad.Length >= 20480) {
+									File.AppendAllText(allFiles[0], tempBad.ToString());
+									tempBad.Clear();
+								}
+							}
 					}
 				}
 				catch { }
 			});
-			if (tempGood.Length > 0)
-				File.AppendAllText(allFiles[4], tempGood.ToString());
-			if (tempBad.Length > 0)
-				File.AppendAllText(allFiles[0], tempBad.ToString());
+
+            if (tempBad.Length > 0) {
+                File.AppendAllText(allFiles[4], tempGood.ToString());
+                tempBad.Clear();
+            }
+            if (tempGood.Length > 0) {
+                File.AppendAllText(allFiles[0], tempBad.ToString());
+                tempGood.Clear();
+            }
+
 			tempGood.Clear();
 			tempBad.Clear();
 
@@ -158,7 +186,7 @@ namespace config {
 					Console.Title = $"[3] {index / roundedCount}% | Cleaning the base.";
 				try {
 					string result = LineUtils.ProcessLine(line, badDNS);
-					if (result.StartsWith('#')) {
+					if (result.StartsWith('#'))
 						lock (lockObj) {
 							tempBad.AppendLine($"{result} {line}");
 							shitCount++;
@@ -167,8 +195,7 @@ namespace config {
 								tempBad.Clear();
 							}
 						}
-					}
-					else {
+					else
 						lock (lockObj) {
 							tempGood.AppendLine($"{result}");
 							goodCount++;
@@ -177,24 +204,21 @@ namespace config {
 								tempGood.Clear();
 							}
 						}
-					}
 				}
 				catch { }
 			});
 
-			if (tempBad.Length > 0) 
-				File.AppendAllLines(allFiles[0], tempBad.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries));
-			if (tempGood.Length > 0)
-				File.AppendAllLines(allFiles[1], tempGood.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries));
-			Console.Title = $"[3] 100% | Cleaning the base. Good: {goodCount}, Bad: {shitCount}";
 			if (tempBad.Length > 0) {
-				File.AppendAllLines(allFiles[0], tempBad.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries));
+                File.AppendAllText(allFiles[0], tempBad.ToString());
 				tempBad.Clear();
 			}
 			if (tempGood.Length > 0) {
-				File.AppendAllLines(allFiles[1], tempGood.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries));
-				tempGood.Clear();
+                File.AppendAllText(allFiles[1], tempGood.ToString());
+                tempGood.Clear();
 			}
+			
+			Console.Title = $"[3] 100% | Cleaning the base. Good: {goodCount}, Bad: {shitCount}";
+			
 			ConsoleUtils.WriteColorized("[3] ", ConsoleColor.Green);
 			Console.WriteLine($"Done! There is {shitCount} bad lines and {goodCount} good lines.");
 			ConsoleUtils.WriteColorized("[4] ", ConsoleColor.DarkYellow);
@@ -203,71 +227,58 @@ namespace config {
 			File.Delete(allFiles[4]);
 			Task tmpGoodToTxt = FileUtils.TempToTxtAsync(allFiles[1]);
 			Task tmpBadToTxt = FileUtils.TempToTxtAsync(allFiles[0]);
-			await Task.WhenAll(tmpGoodToTxt, tmpBadToTxt);
+			Task.WaitAll(tmpBadToTxt, tmpGoodToTxt);
 			stopWatch.Stop();
-			double seconds = stopWatch.Elapsed.TotalSeconds;
-			double minutes = 0, hours = 0;
-			while (true) {
-				if (seconds >= 60) {
-					minutes++;
-					seconds -= 60;
-				}
-				else if (minutes >= 60) {
-					hours++;
-					minutes -= 60;
-				}
-				else break;
-			}
-			line = "Done! Elapsed";
-			if (hours > 0) line += $" {hours}h";
-			if (minutes > 0) line += $" {minutes}m";
-			if (seconds > 0) line += $" {Math.Round(seconds, 0)}s";
-			ConsoleUtils.WriteColorized("[4] ", ConsoleColor.Green);
-			Console.WriteLine($"{line}.\r\n");
+            ConsoleUtils.WriteColorized("[4] ", ConsoleColor.Green);
+            TimeSpan time = TimeSpan.FromSeconds(stopWatch.Elapsed.TotalSeconds);
+			Console.WriteLine($"Done! Elapsed {time:h\\h\\ m\\m\\ s\\s}.\r\n");
 			Console.Title = "Idle.";
 		}
 
 		public static void PromptConfig() {
 			Console.Write("Do you want to change config?");
 			ConsoleUtils.WriteColorizedYN();
-			while (true) {
-				string? tmpLine = Console.ReadLine()?.Trim().ToLower();
-				if (tmpLine == "y" || tmpLine == "n") {
-					if (tmpLine == "y") {
-						SetConfig("Changing config file.");
-						Console.Clear();
-					}
-					break;
-				}
-				Console.WriteLine("Try again.");
+			bool answer = SetPartConfigBool(""); // call the SetPartConfigBool method with an empty prompt
+			if (answer) { // check if the answer is true
+				SetConfig("Changing config file."); // call the SetConfig method
+				Console.Clear();
 			}
 		}
 
 		public static void SetConfig(string msg) {
 			Console.WriteLine(msg);
 			Console.WriteLine("Note: If all answers is \"n\", program will fix only syntax errors.");
-			checkDNS = SetPartConfigBool(checkDNS_prompt);
-			removeXXXX = SetPartConfigBool(removeXXXX_prompt);
-			removeEmptyPass = SetPartConfigBool(removeEmptyPass_prompt);
-			removeXumer = SetPartConfigBool(removeXumer_prompt);
-			removeEqualLoginPass = SetPartConfigBool(removeEqualLoginPass_prompt);
-			removeTempMail = SetPartConfigBool(removeTempMail_prompt);
-			fixDotsGmail = SetPartConfigBool(fixDotsGmail_prompt);
-			fixDotsYandex = SetPartConfigBool(fixDotsYandex_prompt);
-			fixPlus = SetPartConfigBool(fixPlus_prompt);
-			fixDomains = SetPartConfigBool(fixDomains_prompt);
-
-			string write = $"Check DNS: {checkDNS}\n" +
-				$"RemoveXXXX: {removeXXXX}\n" +
-				$"RemoveEmptyPass: {removeEmptyPass}\nRemoveXrumer: {removeXumer}\n" +
-				$"RemoveEqualLoginPass: {removeEqualLoginPass}\nRemoveTempMail: {removeTempMail}\n" +
-				$"FixDotsGmail: {fixDotsGmail}\nFixDotsYandex: {fixDotsYandex}\n" +
-				$"FixPlus: {fixPlus}\nFixDomains: {fixDomains}";
-			File.WriteAllText("config.cfg", write);
+			var settings = new Dictionary<string, bool>(); // create a dictionary to store the settings
+			var prompts = new Dictionary<string, string> {
+				// add the setting names and prompts to the dictionaries
+				["checkDNS"] = checkDNS_prompt,
+				["removeXXXX"] = removeXXXX_prompt,
+				["removeEmptyPass"] = removeEmptyPass_prompt,
+				["removeXumer"] = removeXumer_prompt,
+				["removeEqualLoginPass"] = removeEqualLoginPass_prompt,
+				["removeTempMail"] = removeTempMail_prompt,
+				["fixDotsGmail"] = fixDotsGmail_prompt,
+				["fixDotsYandex"] = fixDotsYandex_prompt,
+				["fixPlus"] = fixPlus_prompt,
+				["fixDomains"] = fixDomains_prompt
+			}; // create a dictionary to store the prompts
+			foreach (string name in prompts.Keys) { // loop through all setting names
+				string prompt = prompts[name]; // get the prompt for each setting
+				bool value = SetPartConfigBool(prompt); // get the value for each setting
+				settings[name] = value; // add or update the setting in the dictionary
+			}
+			string write = ""; // create an empty string to write to the file
+			foreach (string name in settings.Keys) { // loop through all setting names
+				bool value = settings[name]; // get the value for each setting
+				write += $"{name}: {value}\n"; // append each setting name and value to the string with a newline character
+			}
+			File.WriteAllText("config.cfg", write); // write the string to the file
 		}
+
 		public static bool SetPartConfigBool(string msg) {
 			while (true) {
-				Console.WriteLine(msg);
+				if (msg != "")
+					Console.WriteLine(msg);
 				string input = Console.ReadLine().Trim().ToLower();
 				if (input == "y" || input == "n")
 					return input == "y";
