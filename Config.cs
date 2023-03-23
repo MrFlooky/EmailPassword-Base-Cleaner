@@ -279,9 +279,10 @@ namespace config {
 			while (true) {
 				if (msg != "")
 					Console.WriteLine(msg);
-				string input = Console.ReadLine().Trim().ToLower();
-				if (input == "y" || input == "n")
-					return input == "y";
+				var key = Console.ReadKey();
+				Console.WriteLine();
+				if (key.Key == ConsoleKey.Y || key.Key == ConsoleKey.N)
+					return key.Key == ConsoleKey.Y;
 				Console.WriteLine("Invalid input, try again.");
 			}
 		}

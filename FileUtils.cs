@@ -12,7 +12,9 @@ namespace fileutils {
             string templine = splitter == ';' ? line.Replace(';', ':') : line;
             if (Config.fixDomains) {
                 string[] splitLine = line.Split(splitter);
-                templine = $"{splitLine[0].Split('@')[0]}@{LineUtils.DomainFix(splitLine[0].Split('@')[1].Split('.')[0], fixDomains, domains)}{LineUtils.ZoneFix(splitLine[0].Split('@')[1].Split('.')[1], fixZones, zones)}";
+                templine = $"{splitLine[0].Split('@')[0]}@";
+                templine += $"{LineUtils.DomainFix(splitLine[0].Split('@')[1].Split('.')[0], fixDomains, domains)}";
+                templine += $"{LineUtils.ZoneFix(splitLine[0].Split('@')[1].Split('.')[1], fixZones, zones)}";
                 if (splitter != '@' && splitLine.Length >= 2)
                     templine += ":" + string.Join(":", splitLine.Skip(1));
             }

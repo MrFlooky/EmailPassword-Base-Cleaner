@@ -18,20 +18,18 @@ namespace lineutils {
 			ConcurrentBag<string> badDNS = new(FileUtils.WriteToHashSet(files[0]));
 			ConcurrentBag<string> domains = new();
 			Console.Title = $"[2.1] 0% | Filtering DNS addresses.";
-			double roundedCount = Math.Round((double)linesCount / 100), i = 0;
+            double roundedCount = Math.Ceiling((double)linesCount / 100), i = 0;
             Parallel.ForEach(File.ReadLines(path), options, line => {
 				if (i++ % roundedCount == 0)
 					Console.Title = $"[2.1] {Math.Round(i / roundedCount, 0)}% | Filtering DNS addresses.";
 				Match match = domainCheck.Match(line);
-				string domain = "";
 				if (!match.Success) return;
-				domain = match.Groups[1].Value.ToLower();
+				string domain = match.Groups[1].Value.ToLower();
 				if (!domains.Contains(domain) && !goodDNS.Contains(domain) && !badDNS.Contains(domain) && !FileUtils.tempDomains.Contains(domain))
 					domains.Add(domain);
 			});
-
             goodDNS = null;
-			i = 0;
+            i = 0;
 			ConsoleUtils.WriteColorized("[2.1] ", ConsoleColor.Green);
 			Console.Write($"Done!");
 			if (domains.IsEmpty) {
@@ -48,13 +46,12 @@ namespace lineutils {
 				.ToList();
 			domains = null;
 			linesCount = chunks.Sum(chunk => chunk.Count);
-			roundedCount = Math.Round((double)linesCount / 100);
+			roundedCount = Math.Ceiling((double)linesCount / 100);
 			ConsoleUtils.WriteColorized("[2.2] ", ConsoleColor.Green);
 			Console.WriteLine($"Done! There is {linesCount} domains to check.");
 			ConsoleUtils.WriteColorized("[2.3] ", ConsoleColor.DarkYellow);
 			Console.WriteLine("Checking DNS's MX of domains. Please wait...");
 			Console.Title = $"[2.3] 0% | Checking DNS's MX of domains.";
-			int badDNSCount = 0, goodDNSCount = 0;
 			StringBuilder badDNSBuilder = new(capacity: 10000000);
 			StringBuilder goodDNSBuilder = new(capacity: 10000000);
 			var client = new LookupClient(new LookupClientOptions {
@@ -62,7 +59,7 @@ namespace lineutils {
 				UseTcpOnly = true,
 				Timeout = TimeSpan.FromSeconds(1)
 			});
-			int semaphoreCount = 100;
+			int badDNSCount = 0, goodDNSCount = 0, semaphoreCount = 100;
 			if (chunks.Count < 100)
 				semaphoreCount = chunks.Count;
 
