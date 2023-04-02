@@ -1,8 +1,9 @@
 ﻿using config;
 using consoleutils;
 using fileutils;
+using System.Diagnostics;
 
-Console.WriteLine("Created by @NoNameDevLog");
+Console.WriteLine("Created by bhf.gg/members/217675");
 
 string input = "", output = "";
 if (args.Length > 0)
@@ -21,6 +22,15 @@ while (true) {
         Console.WriteLine("Drop a file here: ");
         path = Console.ReadLine().Replace("\"", "");
         Console.Clear();
+    }
+    if (path == "Easter!") {
+        Console.WriteLine("Hey! It's not valid path :)");
+        continue;
+    }
+    if (path == "Link!") {
+        Console.WriteLine("Hey! It's not valid path :)");
+        Process.Start(new ProcessStartInfo("cmd", $"/c start http://bhf.gg/members/217675/") { CreateNoWindow = true });
+        continue;
     }
     if (Path.GetExtension(path) != ".txt" || !File.Exists(path)) {
         Console.WriteLine("Give me a valid .txt file that exists.");

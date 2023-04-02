@@ -18,8 +18,8 @@ namespace config {
 		public static readonly string removeTempMail_prompt = "Remove temp mails? y / n";
 		public static readonly string removeXumer_prompt = "Remove xrumer (spam) mails? y / n";
 		public static readonly string removeXXXX_prompt = "Remove \"xxxx\" in google mails? y / n";
-		public static readonly string cleanGener_prompt = "Clean base from generated lines? y / n";
-		public static readonly string query_prompt = "Request a change of settings in the future? (! THIS IS PERMANENT OPTION !) y / n";
+        public static readonly string cleanGener_prompt = "Remove lines with generated lines? y / n";
+        public static readonly string query_prompt = "Request a change of settings in the future? (! THIS IS PERMANENT OPTION !) y / n";
 		public static bool checkDNS = true;
 		public static bool fixDomains = true;
 		public static bool fixDotsGmail = true;
@@ -30,9 +30,10 @@ namespace config {
 		public static bool removeTempMail = true;
 		public static bool removeXumer = true;
 		public static bool removeXXXX = true;
-		public static bool cleanGener = true;
-		public static bool query = true;
+        public static bool cleanGener = true;
+        public static bool query = true;
 		public static bool workWithArgs = false;
+
         public static Regex htmlencodeRegex = new(@"&[A-Za-z\d]{2,6};");
         public static Regex loginpassRegex = new(@"^[A-Za-z\d][\w.+-]*@(?:[A-Za-z\d][A-Za-z\d-]*\.)+[A-Za-z]?[A-Za-z\d]{1,10}[;:].*?$");
         public static Regex loginpassPartialRegex = new(@"[A-Za-z\d][\w.+-]*@(?:[A-Za-z\d][A-Za-z\d-]*\.)+[A-Za-z]?[A-Za-z\d]{1,10}[;:].*?(?:[;:]|$)");
@@ -70,8 +71,8 @@ namespace config {
 					fixDotsYandex = settings["fixDotsYandex"];
 					fixPlus = settings["fixPlus"];
 					fixDomains = settings["fixDomains"];
-					cleanGener = settings["cleanGener"];
-					query = settings["query"];
+                    cleanGener = settings["cleanGener"];
+                    query = settings["query"];
 				}
 				catch {
 					SetConfig("Config file is corrupted.");
@@ -122,7 +123,8 @@ namespace config {
 			Stopwatch stopWatch = new();
 			stopWatch.Start();
 			StringBuilder tempGood = new(), tempBad = new();
-			object lockObj = new();
+            long goodCount = 0, shitCount = 0;
+            object lockObj = new();
 
 			foreach (var item in fixDomainsDictionary)
 				domains.Add(item.Value);
@@ -137,30 +139,21 @@ namespace config {
 					if (line.StartsWith('#'))
 						lock (lockObj) {
 							tempBad.AppendLine(line);
-							if (tempBad.Length >= 20480) {
-								File.AppendAllText(allFiles[0], tempBad.ToString());
-								tempBad.Clear();
-							}
-						}
+                            FileUtils.WriteSBToFile(tempBad, 20480, allFiles[0]);
+                        }
 
 					if (loginpassRegex.IsMatch(line) || mailRegex.IsMatch(line))
 						lock (lockObj) {
 							tempGood.AppendLine(line);
-							if (tempGood.Length >= 20480) {
-								File.AppendAllText(allFiles[2], tempGood.ToString());
-								tempGood.Clear();
-							}
-						}
+                            FileUtils.WriteSBToFile(tempGood, 20480, allFiles[2]);
+                        }
 					else {
 						Match match = loginpassPartialRegex.Match(line);
 						if (match.Success)
 							lock (lockObj) {
 								tempGood.AppendLine(match.Value);
-								if (tempGood.Length >= 20480) {
-									File.AppendAllText(allFiles[2], tempGood.ToString());
-									tempGood.Clear();
-								}
-							}
+								FileUtils.WriteSBToFile(tempGood, 20480, allFiles[2]);
+                            }
 					}
 				}
 				catch { }
@@ -169,14 +162,8 @@ namespace config {
 			ConsoleUtils.WriteColorized($"[{step}] ", ConsoleColor.Green);
 			Console.WriteLine("Done!");
 
-			if (tempBad.Length > 0) {
-				File.AppendAllText(allFiles[0], tempBad.ToString());
-				tempBad.Clear();
-			}
-			if (tempGood.Length > 0) {
-				File.AppendAllText(allFiles[2], tempGood.ToString());
-				tempGood.Clear();
-			}
+            FileUtils.WriteSBToFile(tempBad, 0, allFiles[0]);
+            FileUtils.WriteSBToFile(tempGood, 0, allFiles[2]);
 
 			if (!File.Exists(allFiles[2])) {
 				Console.Title = "Idle.";
@@ -189,7 +176,6 @@ namespace config {
 				step++;
 				badDNS = await FileUtils.DNSCheck(allFiles[2], lines, step);
 			}
-			long goodCount = 0, shitCount = 0;
 			if (cleanGener) {
 				step++;
 				Console.Title = $"[{step}] Cleaning generated lines.";
@@ -202,7 +188,6 @@ namespace config {
 				FileUtils.WriteHashsetToFile(allFiles[0], badGener, true);
 				ConsoleUtils.WriteColorized($"[{step}] ", ConsoleColor.Green);
 				Console.WriteLine("Done!");
-				goodCount = lines - shitCount;
 			}
 			step++;
 			ConsoleUtils.WriteColorized($"[{step}] ", ConsoleColor.DarkYellow);
@@ -218,34 +203,22 @@ namespace config {
 						lock (lockObj) {
 							tempBad.AppendLine($"{result} {line}");
 							shitCount++;
-							if (tempBad.Length >= 20480) {
-								File.AppendAllLines(allFiles[0], tempBad.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries));
-								tempBad.Clear();
-							}
-						}
+                            FileUtils.WriteSBToFile(tempBad, 20480, allFiles[0]);
+                        }
 					else
 						lock (lockObj) {
 							tempGood.AppendLine($"{result}");
 							goodCount++;
-							if (tempGood.Length >= 20480) {
-								File.AppendAllLines(allFiles[1], tempGood.ToString().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries));
-								tempGood.Clear();
-							}
-						}
+                            FileUtils.WriteSBToFile(tempGood, 20480, allFiles[1]);
+                        }
 				}
 				catch { }
 			});
 
-			if (tempBad.Length > 0) {
-				File.AppendAllText(allFiles[0], tempBad.ToString());
-				tempBad.Clear();
-			}
-			if (tempGood.Length > 0) {
-				File.AppendAllText(allFiles[1], tempGood.ToString());
-				tempGood.Clear();
-			}
+            FileUtils.WriteSBToFile(tempBad, 0, allFiles[0]);
+            FileUtils.WriteSBToFile(tempGood, 0, allFiles[1]);
 
-			Console.Title = $"[{step}] 100% | Cleaning the base. Good: {goodCount}, Bad: {shitCount}";
+            Console.Title = $"[{step}] 100% | Cleaning the base. Good: {goodCount}, Bad: {shitCount}";
 
 			ConsoleUtils.WriteColorized($"[{step}] ", ConsoleColor.Green);
 			Console.WriteLine($"Done! There is {shitCount} bad lines and {goodCount} good lines.");
@@ -295,8 +268,8 @@ namespace config {
 				["fixDotsYandex"] = fixDotsYandex_prompt,
 				["fixPlus"] = fixPlus_prompt,
 				["fixDomains"] = fixDomains_prompt,
-				["cleanGener"] = cleanGener_prompt,
-				["query"] = query_prompt
+                ["cleanGener"] = cleanGener_prompt,
+                ["query"] = query_prompt
 			};
 			bool isAllTrue = SetPartConfigBool("Set all \"y\"?");
 			foreach (string name in prompts.Keys) {

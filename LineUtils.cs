@@ -52,7 +52,8 @@ namespace lineutils {
             if (Config.removeEmptyPass && typeOfLine && mailPass[1] == "")
                 return $"#EmptyPass#";
 
-            string[] loginDomain = mailPass[0].ToLower().Split("@");
+            string[] loginDomain = mailPass[0].ToLower().Split('@');
+            mailPass[1] = mailPass[1].Replace("№", "");
 
             //EMAIL CHECK
 

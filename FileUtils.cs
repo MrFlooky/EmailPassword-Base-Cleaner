@@ -20,8 +20,8 @@ namespace fileutils {
 
 		public static async Task TempToTxtAsync(string file) {
 			if (!File.Exists(file) || !file.EndsWith(".tmp")) return;
-			var lines = new SortedSet<string>();
-			using (var reader = new StreamReader(file)) {
+            SortedSet<string> lines = new();
+			using (StreamReader reader = new(file)) {
 				string line;
 				while ((line = await reader.ReadLineAsync()) != null)
 					lines.Add(line);
@@ -182,5 +182,11 @@ namespace fileutils {
                 }
             }
 		}
+
+		public static void WriteSBToFile(StringBuilder sb, int length, string file) {
+			if (sb.Length < length) return;
+            File.AppendAllText(file, sb.ToString());
+            sb.Clear();
+        }
 	}
 }
