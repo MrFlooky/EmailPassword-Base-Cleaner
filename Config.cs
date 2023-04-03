@@ -45,6 +45,9 @@ namespace config {
         public static HashSet<string> domains = new();
         public static HashSet<string> zones = new();
         public static ParallelOptions options = new() { MaxDegreeOfParallelism = Environment.ProcessorCount };
+
+        public static string path = "";
+
         public static bool CheckConfig() {
 			if (!File.Exists("config.cfg")) {
 				SetConfig("Config file not found.");
@@ -95,7 +98,7 @@ namespace config {
 			}
 		}
 
-		public static async Task MainWork(string path, string output) {
+		public static async Task MainWork(string output) {
 			long lines = FileUtils.GetLinesCount(path);
 			workWithArgs = !string.IsNullOrEmpty(output);
 			string fileName = Path.GetFileNameWithoutExtension(path);
@@ -141,7 +144,6 @@ namespace config {
 							tempBad.AppendLine(line);
                             FileUtils.WriteSBToFile(tempBad, 20480, allFiles[0]);
                         }
-
 					if (loginpassRegex.IsMatch(line) || mailRegex.IsMatch(line))
 						lock (lockObj) {
 							tempGood.AppendLine(line);

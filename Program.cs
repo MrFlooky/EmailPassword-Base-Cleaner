@@ -17,27 +17,27 @@ if (Config.CheckConfig())
 
 while (true) {
     Console.Title = "Idle.";
-    string path = input;
+    Config.path = input;
     if (!Config.workWithArgs) {
         Console.WriteLine("Drop a file here: ");
-        path = Console.ReadLine().Replace("\"", "");
+        Config.path = Console.ReadLine().Replace("\"", "");
         Console.Clear();
     }
-    if (path == "Easter!") {
+    if (Config.path == "Easter!") {
         Console.WriteLine("Hey! It's not valid path :)");
         continue;
     }
-    if (path == "Link!") {
+    if (Config.path == "Link!") {
         Console.WriteLine("Hey! It's not valid path :)");
         Process.Start(new ProcessStartInfo("cmd", $"/c start http://bhf.gg/members/217675/") { CreateNoWindow = true });
         continue;
     }
-    if (Path.GetExtension(path) != ".txt" || !File.Exists(path)) {
+    if (Path.GetExtension(Config.path) != ".txt" || !File.Exists(Config.path)) {
         Console.WriteLine("Give me a valid .txt file that exists.");
         if (!Config.workWithArgs) continue;
         else break;
     }
-    Config.MainWork(path, output).Wait();
+    Config.MainWork(output).Wait();
     if (!Config.workWithArgs) {
         Console.Write("Do you want to exit?");
         ConsoleUtils.WriteColorizedYN();
