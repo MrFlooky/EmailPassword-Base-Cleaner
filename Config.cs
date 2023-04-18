@@ -39,7 +39,7 @@ namespace config {
 		public static bool query = true;
 
 		public static bool workWithArgs = false;
-		public static bool workWithContex = false;
+		public static bool workWithcontext = false;
 
 		private static readonly string domainPartRegex = @"(?:[A-Za-z\d][A-Za-z\d-]*\.)+[A-Za-z]?[A-Za-z\d]{1,10}";
 		private static readonly string mailPartRegex = @"[A-Za-z\d][\w.+-]*@" + domainPartRegex;
@@ -50,8 +50,8 @@ namespace config {
 		public static Regex mailRegex = new(@"^" + mailPartRegex + "$");
 		public static Regex domainCheck = new(@"@([\w-]+(?:\.[\w-]+)+)(?::|$)");
 		public static Regex domainRegex = new("^" + domainPartRegex + "$");
-		public static Dictionary<string, string> fixDomainsDictionary = FileUtils.WriteToDictionary(files[1]);
-		public static Dictionary<string, string> fixZonesDictionary = FileUtils.WriteToDictionary(files[2]);
+		public static Dictionary<string, string> fixDomainsDictionary = new();
+		public static Dictionary<string, string> fixZonesDictionary = new();
 		public static HashSet<string> domains = new();
 		public static HashSet<string> zones = new();
 		public static ParallelOptions options = new() { MaxDegreeOfParallelism = Environment.ProcessorCount };
@@ -99,11 +99,13 @@ namespace config {
 			if (files.Any(file => !File.Exists(file))) {
 				foreach (string file in files)
 					if (!File.Exists(file))
-						Console.WriteLine($"\"{file}\" file not found.");
+						Console.WriteLine($"\"{Path.GetFileName(file)}\" file not found.");
 				if (!workWithArgs)
 					Console.ReadLine();
 				Environment.Exit(0);
 			}
+			fixDomainsDictionary = FileUtils.WriteToDictionary(files[1]);
+			fixZonesDictionary = FileUtils.WriteToDictionary(files[2]);
 		}
 
 		public static async Task MainWork(string output) {
@@ -113,7 +115,7 @@ namespace config {
 			output = output.Split('.')[0];
 			string[] allFiles = new string[3] { $"./{output}_shit.tmp",
 					$"./{output}.tmp", $"./{output}_tmp.tmp" };
-			if (workWithContex)
+			if (workWithcontext)
 				allFiles = new string[3] { $"{output}_shit.tmp",
 					$"{output}.tmp", $"{output}_tmp.tmp" };
 			if (!workWithArgs) {

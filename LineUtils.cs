@@ -17,9 +17,11 @@ namespace lineutils {
 		public static char GetSplitter(string line) {
 			if (line.Contains(';'))
 				return ';';
+			if (line.Contains(':'))
+				return ':';
 			if (Config.mailRegex.IsMatch(line))
 				return '@';
-			return ':';
+			return '\0';
 		}
 
 		public static string HexFix(string line) {
@@ -148,7 +150,23 @@ namespace lineutils {
 			return templine;
 		}
 
-        /*public static int StringCompare(string first, string second) {
+		public static long GetMaxFileSize(string input) {
+			input = input.Replace(" ", "");
+			char lastChar = input[^1];
+			if (char.IsLetter(lastChar)) {
+				input = input[..^1];
+				long size = long.Parse(input);
+				return lastChar switch {
+					'K' => size * 1024,
+					'M' => size * 1024 * 1024,
+					'G' => size * 1024 * 1024 * 1024,
+					_ => throw new ArgumentException("Invalid size suffix"),
+				};
+			}
+			else return long.Parse(input);
+		}
+
+		/*public static int StringCompare(string first, string second) {
             int min = Math.Min(first.Length, second.Length);
             int sum = 0;
 			for (int i = 0; i < min; ++i)
@@ -165,5 +183,5 @@ namespace lineutils {
             //sum += second[i];
             return Math.Abs(sum);
         }*/
-    }
+	}
 }

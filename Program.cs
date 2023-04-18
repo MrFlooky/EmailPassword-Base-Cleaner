@@ -3,8 +3,7 @@ using consoleutils;
 using System.Diagnostics;
 
 Console.WriteLine("Created by bhf.gg/members/217675");
-ConsoleUtils.SetupContexMenu();
-
+ConsoleUtils.SetupContextMenu();
 string input = "", output = "";
 if (args.Length > 0)
     Config.workWithArgs = ConsoleUtils.WorkWithArgs(args, ref input, ref output);

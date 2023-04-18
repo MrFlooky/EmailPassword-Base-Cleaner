@@ -38,6 +38,12 @@ namespace fileutils {
 			foreach (string line in lines)
 				sw.WriteLine(line);
 		}
+		
+		public static void WriteListToFile(string filename, List<string> lines, bool append) {
+			using StreamWriter sw = new(filename, append);
+			foreach (string line in lines)
+				sw.WriteLine(line);
+		}
 
 		public static Dictionary<string, string> WriteToDictionary(string fileName) {
 			Dictionary<string, string> result = new();
