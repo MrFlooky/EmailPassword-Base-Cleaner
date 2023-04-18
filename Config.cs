@@ -8,6 +8,11 @@ using System.Text.RegularExpressions;
 namespace config {
 
 	internal class Config {
+		public static string path = "";
+		public static string currentDir = AppDomain.CurrentDomain.BaseDirectory;
+		public static string exePath = Process.GetCurrentProcess().MainModule.FileName;
+		public static string[] files = new string[6] { $"{currentDir}BadDNS", $"{currentDir}FixDomains", $"{currentDir}FixZone", $"{currentDir}GoodDNS", $"{currentDir}TempMails", $"{currentDir}config.cfg" };
+
 		public static readonly string checkDNS_prompt = "Check DNS of domains in emails? y / n";
 		public static readonly string fixDomains_prompt = "Fix domains and domain zones? y / n";
 		public static readonly string fixDotsGmail_prompt = "Remove dots in google mails? y / n";
@@ -18,8 +23,8 @@ namespace config {
 		public static readonly string removeTempMail_prompt = "Remove temp mails? y / n";
 		public static readonly string removeXumer_prompt = "Remove xrumer (spam) mails? y / n";
 		public static readonly string removeXXXX_prompt = "Remove \"xxxx\" in google mails? y / n";
-        public static readonly string cleanGener_prompt = "Remove lines with generated lines? y / n";
-        public static readonly string query_prompt = "Request a change of settings in the future? (! THIS IS PERMANENT OPTION !) y / n";
+		public static readonly string cleanSameMails_prompt = "Remove lines with generated lines? y / n";
+		public static readonly string query_prompt = "Request a change of settings in the future? (! THIS IS PERMANENT OPTION !) y / n";
 		public static bool checkDNS = true;
 		public static bool fixDomains = true;
 		public static bool fixDotsGmail = true;
@@ -30,26 +35,29 @@ namespace config {
 		public static bool removeTempMail = true;
 		public static bool removeXumer = true;
 		public static bool removeXXXX = true;
-        public static bool cleanGener = true;
-        public static bool query = true;
+		public static bool cleanSameMails = true;
+		public static bool query = true;
+
 		public static bool workWithArgs = false;
+		public static bool workWithContex = false;
 
-        public static Regex htmlencodeRegex = new(@"&[A-Za-z\d]{2,6};");
-        public static Regex loginpassRegex = new(@"^[A-Za-z\d][\w.+-]*@(?:[A-Za-z\d][A-Za-z\d-]*\.)+[A-Za-z]?[A-Za-z\d]{1,10}[;:].*?$");
-        public static Regex loginpassPartialRegex = new(@"[A-Za-z\d][\w.+-]*@(?:[A-Za-z\d][A-Za-z\d-]*\.)+[A-Za-z]?[A-Za-z\d]{1,10}[;:].*?(?:[;:]|$)");
-        public static Regex mailRegex = new(@"^[A-Za-z\d][\w.+-]*@([A-Za-z\d][A-Za-z\d-]*\.)+[A-Za-z]?[A-Za-z\d]{1,10}$");
-        public static Regex domainCheck = new(@"@([\w-]+(?:\.[\w-]+)+)(?::|$)");
-        public static Regex domainRegex = new(@"^([A-Za-z\d][A-Za-z\d-]*\.)+[A-Za-z]?[A-Za-z\d]{1,10}$");
-        public static Dictionary<string, string> fixDomainsDictionary = FileUtils.WriteToDictionary("FixDomains");
-        public static Dictionary<string, string> fixZonesDictionary = FileUtils.WriteToDictionary("FixZone");
-        public static HashSet<string> domains = new();
-        public static HashSet<string> zones = new();
-        public static ParallelOptions options = new() { MaxDegreeOfParallelism = Environment.ProcessorCount };
+		private static readonly string domainPartRegex = @"(?:[A-Za-z\d][A-Za-z\d-]*\.)+[A-Za-z]?[A-Za-z\d]{1,10}";
+		private static readonly string mailPartRegex = @"[A-Za-z\d][\w.+-]*@" + domainPartRegex;
+		public static Regex hashRegex = new(@"^(?=(?:.*[a-f]){3})[\da-f$.]{16,}$");
+		public static Regex htmlencodeRegex = new(@"&[A-Za-z\d]{2,6};");
+		public static Regex loginpassRegex = new(@"^" + mailPartRegex + "[;:].*?$");
+		public static Regex loginpassPartialRegex = new(mailPartRegex + @"[;:].*?(?:[;:]|$)");
+		public static Regex mailRegex = new(@"^" + mailPartRegex + "$");
+		public static Regex domainCheck = new(@"@([\w-]+(?:\.[\w-]+)+)(?::|$)");
+		public static Regex domainRegex = new("^" + domainPartRegex + "$");
+		public static Dictionary<string, string> fixDomainsDictionary = FileUtils.WriteToDictionary(files[1]);
+		public static Dictionary<string, string> fixZonesDictionary = FileUtils.WriteToDictionary(files[2]);
+		public static HashSet<string> domains = new();
+		public static HashSet<string> zones = new();
+		public static ParallelOptions options = new() { MaxDegreeOfParallelism = Environment.ProcessorCount };
 
-        public static string path = "";
-
-        public static bool CheckConfig() {
-			if (!File.Exists("config.cfg")) {
+		public static bool CheckConfig() {
+			if (!File.Exists(files[5])) {
 				SetConfig("Config file not found.");
 				if (!workWithArgs)
 					Console.Clear();
@@ -58,7 +66,7 @@ namespace config {
 			else {
 				try {
 					var settings = new Dictionary<string, bool>(); // create a dictionary to store the settings
-					foreach (string line in File.ReadLines("config.cfg")) { // loop through each line in the file
+					foreach (string line in File.ReadLines(files[5])) { // loop through each line in the file
 						string[] parts = line.Split(": "); // split the line by ": "
 						string name = parts[0]; // get the setting name
 						bool value = bool.Parse(parts[1]); // get the setting value
@@ -74,8 +82,8 @@ namespace config {
 					fixDotsYandex = settings["fixDotsYandex"];
 					fixPlus = settings["fixPlus"];
 					fixDomains = settings["fixDomains"];
-                    cleanGener = settings["cleanGener"];
-                    query = settings["query"];
+					cleanSameMails = settings["cleanSameMails"];
+					query = settings["query"];
 				}
 				catch {
 					SetConfig("Config file is corrupted.");
@@ -88,9 +96,9 @@ namespace config {
 		}
 
 		public static void CheckFiles(string[] files) {
-			if (files.Any(file => !File.Exists(file))) { // check if any file does not exist
-				foreach (string file in files) // loop through all files
-					if (!File.Exists(file)) // print only the ones that do not exist
+			if (files.Any(file => !File.Exists(file))) {
+				foreach (string file in files)
+					if (!File.Exists(file))
 						Console.WriteLine($"\"{file}\" file not found.");
 				if (!workWithArgs)
 					Console.ReadLine();
@@ -99,21 +107,24 @@ namespace config {
 		}
 
 		public static async Task MainWork(string output) {
-			long lines = FileUtils.GetLinesCount(path);
+			double lines = FileUtils.GetLinesCount(path);
 			workWithArgs = !string.IsNullOrEmpty(output);
 			string fileName = Path.GetFileNameWithoutExtension(path);
 			output = output.Split('.')[0];
 			string[] allFiles = new string[3] { $"./{output}_shit.tmp",
 					$"./{output}.tmp", $"./{output}_tmp.tmp" };
+			if (workWithContex)
+				allFiles = new string[3] { $"{output}_shit.tmp",
+					$"{output}.tmp", $"{output}_tmp.tmp" };
 			if (!workWithArgs) {
 				string dateTime = DateTime.Now.ToString("dd.MM.yyyy HH;mm");
 				allFiles = new string[3] { $"./Results/{fileName}_shit {dateTime}.tmp",
 					$"./Results/{fileName}_good {dateTime}.tmp", $"./Results/{fileName}.tmp" };
 				Console.Clear();
+				if (!Directory.Exists("./Results"))
+					Directory.CreateDirectory("./Results");
 			}
 			int step = 0;
-			if (!Directory.Exists("./Results"))
-				Directory.CreateDirectory("./Results");
 			foreach (string tmpFile in allFiles)
 				if (File.Exists(tmpFile))
 					File.Delete(tmpFile);
@@ -122,12 +133,12 @@ namespace config {
 			step++;
 			ConsoleUtils.WriteColorized($"[{step}] ", ConsoleColor.DarkYellow);
 			Console.WriteLine("Fixing domains and writing to temp file.");
-			double roundedCount = Math.Round((double)lines / 100);
+			double roundedCount = Math.Round(lines / 100);
 			Stopwatch stopWatch = new();
 			stopWatch.Start();
 			StringBuilder tempGood = new(), tempBad = new();
-            long goodCount = 0, shitCount = 0;
-            object lockObj = new();
+			long goodCount = 0, shitCount = 0;
+			object lockObj = new();
 
 			foreach (var item in fixDomainsDictionary)
 				domains.Add(item.Value);
@@ -141,31 +152,32 @@ namespace config {
 					line = LineUtils.FixLine(ref line);
 					if (line.StartsWith('#'))
 						lock (lockObj) {
+							shitCount++;
 							tempBad.AppendLine(line);
-                            FileUtils.WriteSBToFile(tempBad, 20480, allFiles[0]);
-                        }
+							FileUtils.WriteSBToFile(tempBad, 20480, allFiles[0]);
+						}
 					if (loginpassRegex.IsMatch(line) || mailRegex.IsMatch(line))
 						lock (lockObj) {
 							tempGood.AppendLine(line);
-                            FileUtils.WriteSBToFile(tempGood, 20480, allFiles[2]);
-                        }
+							FileUtils.WriteSBToFile(tempGood, 20480, allFiles[2]);
+						}
 					else {
 						Match match = loginpassPartialRegex.Match(line);
 						if (match.Success)
 							lock (lockObj) {
 								tempGood.AppendLine(match.Value);
 								FileUtils.WriteSBToFile(tempGood, 20480, allFiles[2]);
-                            }
+							}
 					}
 				}
 				catch { }
 			});
 			Console.Title = $"[{step}] 100% | Fixing domains.";
 			ConsoleUtils.WriteColorized($"[{step}] ", ConsoleColor.Green);
-			Console.WriteLine("Done!");
+			Console.WriteLine($"Done! There is {shitCount} lines with bad syntax.");
 
-            FileUtils.WriteSBToFile(tempBad, 0, allFiles[0]);
-            FileUtils.WriteSBToFile(tempGood, 0, allFiles[2]);
+			FileUtils.WriteSBToFile(tempBad, 0, allFiles[0]);
+			FileUtils.WriteSBToFile(tempGood, 0, allFiles[2]);
 
 			if (!File.Exists(allFiles[2])) {
 				Console.Title = "Idle.";
@@ -178,7 +190,7 @@ namespace config {
 				step++;
 				badDNS = await FileUtils.DNSCheck(allFiles[2], lines, step);
 			}
-			if (cleanGener) {
+			if (cleanSameMails) {
 				step++;
 				Console.Title = $"[{step}] Cleaning generated lines.";
 				ConsoleUtils.WriteColorized($"[{step}] ", ConsoleColor.DarkYellow);
@@ -195,7 +207,7 @@ namespace config {
 			ConsoleUtils.WriteColorized($"[{step}] ", ConsoleColor.DarkYellow);
 			Console.WriteLine("Cleaning the base.");
 			Console.Title = "0% | Cleaning the base.";
-			roundedCount = Math.Round((double)lines / 100);
+			roundedCount = Math.Round(lines / 100);
 			Parallel.ForEach(File.ReadLines(allFiles[2]), options, (line, state, index) => {
 				if (index % roundedCount == 0)
 					Console.Title = $"[{step}] {index / roundedCount}% | Cleaning the base.";
@@ -205,22 +217,23 @@ namespace config {
 						lock (lockObj) {
 							tempBad.AppendLine($"{result} {line}");
 							shitCount++;
-                            FileUtils.WriteSBToFile(tempBad, 20480, allFiles[0]);
-                        }
+							FileUtils.WriteSBToFile(tempBad, 20480, allFiles[0]);
+						}
 					else
 						lock (lockObj) {
 							tempGood.AppendLine($"{result}");
 							goodCount++;
-                            FileUtils.WriteSBToFile(tempGood, 20480, allFiles[1]);
-                        }
+							FileUtils.WriteSBToFile(tempGood, 20480, allFiles[1]);
+						}
 				}
 				catch { }
 			});
+			if (tempBad.Length > 0)
+				FileUtils.WriteSBToFile(tempBad, 0, allFiles[0]);
+			if (tempGood.Length > 0)
+				FileUtils.WriteSBToFile(tempGood, 0, allFiles[1]);
 
-            FileUtils.WriteSBToFile(tempBad, 0, allFiles[0]);
-            FileUtils.WriteSBToFile(tempGood, 0, allFiles[1]);
-
-            Console.Title = $"[{step}] 100% | Cleaning the base. Good: {goodCount}, Bad: {shitCount}";
+			Console.Title = $"[{step}] 100% | Cleaning the base. Good: {goodCount}, Bad: {shitCount}";
 
 			ConsoleUtils.WriteColorized($"[{step}] ", ConsoleColor.Green);
 			Console.WriteLine($"Done! There is {shitCount} bad lines and {goodCount} good lines.");
@@ -255,9 +268,9 @@ namespace config {
 				msg += " Reload app without arguments to setup config.";
 				Console.WriteLine(msg);
 				Environment.Exit(0);
-            }
-            Console.WriteLine(msg);
-            Console.WriteLine("Note: If all answers is \"n\", program will fix only syntax errors.");
+			}
+			Console.WriteLine(msg);
+			Console.WriteLine("Note: If all answers is \"n\", program will fix only syntax errors.");
 			var settings = new Dictionary<string, bool>();
 			var prompts = new Dictionary<string, string> {
 				["checkDNS"] = checkDNS_prompt,
@@ -270,8 +283,8 @@ namespace config {
 				["fixDotsYandex"] = fixDotsYandex_prompt,
 				["fixPlus"] = fixPlus_prompt,
 				["fixDomains"] = fixDomains_prompt,
-                ["cleanGener"] = cleanGener_prompt,
-                ["query"] = query_prompt
+				["cleanSameMails"] = cleanSameMails_prompt,
+				["query"] = query_prompt
 			};
 			bool isAllTrue = SetPartConfigBool("Set all \"y\"?");
 			foreach (string name in prompts.Keys) {
@@ -288,7 +301,7 @@ namespace config {
 				bool value = settings[name];
 				write += $"{name}: {value}\n";
 			}
-			File.WriteAllText("config.cfg", write);
+			File.WriteAllText(files[5], write);
 		}
 
 		public static bool SetPartConfigBool(string msg) {

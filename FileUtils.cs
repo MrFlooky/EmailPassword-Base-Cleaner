@@ -4,15 +4,15 @@ using System.Collections.Concurrent;
 using System.Text;
 using System.Text.RegularExpressions;
 using config;
+using lineutils;
 
 namespace fileutils {
 
 	public class FileUtils {
-		public static readonly string[] files = new string[5] { "BadDNS", "FixDomains", "FixZone", "GoodDNS", "TempMails" };
-		public static readonly HashSet<string> tempDomains = WriteToHashSet(files[4]);
+		public static readonly HashSet<string> tempDomains = WriteToHashSet(Config.files[4]);
 
-		public static long GetLinesCount(string path) {
-			long i = 0;
+		public static double GetLinesCount(string path) {
+			double i = 0;
 			foreach (var line in File.ReadLines(path))
 				i += 1;
 			return i;
@@ -20,7 +20,7 @@ namespace fileutils {
 
 		public static async Task TempToTxtAsync(string file) {
 			if (!File.Exists(file) || !file.EndsWith(".tmp")) return;
-            SortedSet<string> lines = new();
+			SortedSet<string> lines = new();
 			using (StreamReader reader = new(file)) {
 				string line;
 				while ((line = await reader.ReadLineAsync()) != null)
@@ -33,32 +33,31 @@ namespace fileutils {
 		public static HashSet<string> WriteToHashSet(string fileName) =>
 			new(File.ReadLines(fileName));
 
-        public static void WriteHashsetToFile(string filename, HashSet<string> lines, bool append) {
-            using StreamWriter sw = new(filename, append);
-            foreach (string line in lines)
-                sw.WriteLine(line);
-        }
+		public static void WriteHashsetToFile(string filename, HashSet<string> lines, bool append) {
+			using StreamWriter sw = new(filename, append);
+			foreach (string line in lines)
+				sw.WriteLine(line);
+		}
 
-        public static Dictionary<string, string> WriteToDictionary(string fileName) {
-			var result = new Dictionary<string, string>();
-			foreach (var line in File.ReadLines(fileName)) {
-				var parts = line.Split('=');
+		public static Dictionary<string, string> WriteToDictionary(string fileName) {
+			Dictionary<string, string> result = new();
+			foreach (string line in File.ReadLines(fileName)) {
+				string[] parts = line.Split('=');
 				if (parts.Length == 2)
 					result[parts[0]] = parts[1];
 			}
 			return result;
 		}
 
-		public static async Task<HashSet<string>> DNSCheck(string path, float linesCount, int step) {
-			string[] files = new string[5] { "BadDNS", "FixDomains", "FixZone", "GoodDNS", "TempMails" };
-			HashSet<string> goodDNS = WriteToHashSet(files[3]);
-			ConcurrentBag<string> badDNS = new(WriteToHashSet(files[0]));
+		public static async Task<HashSet<string>> DNSCheck(string path, double linesCount, int step) {
+			HashSet<string> goodDNS = WriteToHashSet(Config.files[3]);
+			ConcurrentBag<string> badDNS = new(WriteToHashSet(Config.files[0]));
 			ConcurrentBag<string> domains = new();
 			int sstep = 1;
-            ConsoleUtils.WriteColorized($"[{step}.{sstep}] ", ConsoleColor.DarkYellow);
-            Console.WriteLine("Filtering DNS addresses.");
-            Console.Title = $"[{step}.{sstep}] 0% | Filtering DNS addresses.";
-			double roundedCount = Math.Ceiling((double)linesCount / 100), i = 0;
+			ConsoleUtils.WriteColorized($"[{step}.{sstep}] ", ConsoleColor.DarkYellow);
+			Console.WriteLine("Filtering DNS addresses.");
+			Console.Title = $"[{step}.{sstep}] 0% | Filtering DNS addresses.";
+			double roundedCount = Math.Ceiling(linesCount / 100), i = 0;
 			Parallel.ForEach(File.ReadLines(path), Config.options, line => {
 				if (i++ % roundedCount == 0)
 					Console.Title = $"[{step}] {Math.Round(i / roundedCount, 0)}% | Filtering DNS addresses.";
@@ -66,7 +65,7 @@ namespace fileutils {
 				if (!match.Success && !Config.domainRegex.IsMatch(line))
 					return;
 				string domain = match.Groups[1].Value.ToLower();
-				if (!domains.Contains(domain) && !goodDNS.Contains(domain) && !badDNS.Contains(domain) && !FileUtils.tempDomains.Contains(domain))
+				if (!domains.Contains(domain) && !goodDNS.Contains(domain) && !badDNS.Contains(domain) && !tempDomains.Contains(domain))
 					domains.Add(domain);
 			});
 			goodDNS = null;
@@ -83,7 +82,7 @@ namespace fileutils {
 				.ToList();
 			domains = null;
 			linesCount = chunks.Sum(chunk => chunk.Count);
-			roundedCount = Math.Ceiling((double)linesCount / 100);
+			roundedCount = Math.Ceiling(linesCount / 100);
 			Console.Write($"Done! There is {linesCount} domains to check.\n");
 			sstep++;
 			ConsoleUtils.WriteColorized($"[{step}.{sstep}] ", ConsoleColor.DarkYellow);
@@ -94,7 +93,7 @@ namespace fileutils {
 			LookupClient client = new(new LookupClientOptions {
 				UseCache = true,
 				UseTcpOnly = true,
-				Timeout = TimeSpan.FromSeconds(1)
+				Timeout = TimeSpan.FromSeconds(2)
 			});
 			int badDNSCount = 0, goodDNSCount = 0, semaphoreCount = 100;
 			if (chunks.Count < 100)
@@ -139,8 +138,8 @@ namespace fileutils {
 					}
 				}));
 			await Task.WhenAll(tasks);
-			File.AppendAllText("BadDNS", badDNSBuilder.ToString());
-			File.AppendAllText("GoodDNS", goodDNSBuilder.ToString());
+			File.AppendAllText(Config.files[0], badDNSBuilder.ToString());
+			File.AppendAllText(Config.files[3], goodDNSBuilder.ToString());
 
 			badDNSBuilder = null;
 			goodDNSBuilder = null;
@@ -150,43 +149,114 @@ namespace fileutils {
 		}
 
 		public static void GenerDelete(string path, ref long badCount, ref HashSet<string> good, ref HashSet<string> bad) {
-			HashSet<string> password = new();
-			HashSet<string> dpassword = new();
-			HashSet<string> login = new();
-			HashSet<string> dlogin = new();
+			HashSet<string> mail = new();
+			HashSet<string> dmail = new();
 			HashSet<string> lines = new();
 			using (StreamReader f = new(path)) {
 				string i;
 				while ((i = f.ReadLine()) != null) {
-					string[] logpass = i.Split(':');
-					string log = logpass[0].Split('@')[0];
-					string pas = logpass[1];
-					if (login.Contains(log))
-						dlogin.Add(log);
-					else if (password.Contains(pas))
-						dpassword.Add(pas);
-					login.Add(log);
-					password.Add(pas);
+					char splitter = LineUtils.GetSplitter(i);
+					if (splitter == '@') continue;
+					string[] logpass = i.Split(splitter);
+					string log = logpass[0];
+					if (mail.Contains(log))
+                        dmail.Add(log);
+                    mail.Add(log);
 					lines.Add(i);
 				}
 			}
 			foreach (string i in lines) {
-                string[] logpass = i.Split(':');
-                string log = logpass[0].Split('@')[0];
-                string pas = logpass[1];
-				if (!dlogin.Contains(log) && !dpassword.Contains(pas))
+                char splitter = LineUtils.GetSplitter(i);
+                if (splitter == '@') continue;
+                string[] logpass = i.Split(splitter);
+                string log = logpass[0];
+				if (!dmail.Contains(log))
 					good.Add(i);
 				else {
 					bad.Add($"#Generated# {i}");
 					badCount++;
-                }
-            }
+				}
+			}
 		}
 
+		/*public static void GenerDelete(string path, ref long badCount, ref HashSet<string> lines, ref HashSet<string> bad) {
+			lines = WriteToHashSet(path);
+			HashSet<string> passwords = new();
+			HashSet<string> badpasswords = new();
+			HashSet<string> mails = new();
+			foreach (string line in lines) {
+				char splitter = LineUtils.GetSplitter(line);
+				if (splitter == '@') continue;
+				string[] lp = line.Split(splitter);
+				if (Config.hashRegex.IsMatch(lp[1])) continue;
+				if (passwords.Contains(lp[1]) && mails.Contains(lp[0])) continue;
+				mails.Add(lp[0].Split('@')[0]);
+				passwords.Add(lp[1]);
+			}
+			/*try {
+				for (int i = 0; i < passwords.Count; ++i) {
+					string pass1 = passwords.ElementAt(i);
+					string mail1 = mails.ElementAt(i);
+					for (int j = 0; j < passwords.Count; ++j) {
+						string pass2 = passwords.ElementAt(j);
+						string mail2 = mails.ElementAt(j);
+						if (pass2 == "111111123") {
+							string asd = "";
+						}
+						if (badpasswords.Contains(passwords.ElementAt(j))) continue;
+						if (pass1 == pass2 && mail1 != mail2) continue;
+						if (LineUtils.StringCompare(pass1, pass2) <= 3) {
+							badpasswords.Add(pass2);
+							badCount++;
+							break;
+						}
+					}
+				}
+			}
+			catch {
+				string asd = "";
+			}*/
+
+			/*foreach (string pass1 in passwords) {
+				foreach (string pass2 in passwords) {
+					if (badpasswords.Contains(pass2)) continue;
+					if (pass1 == pass2) continue;
+					int sum = LineUtils.StringCompare(pass1, pass2);
+					if (sum <= 3) {
+						badpasswords.Add(pass2);
+						badCount++;
+						break;
+					}
+				}
+			}
+
+			bad = GetBadPasswordLines(lines, badpasswords);
+			DeleteBadPasswords(lines, badpasswords);
+		}*/
+
+		/*public static void DeleteBadPasswords(HashSet<string> lines, HashSet<string> badpasswords) =>
+			lines.RemoveWhere(line => {
+				char splitter = LineUtils.GetSplitter(line);
+				if (splitter == '@') return false;
+				return badpasswords.Contains(line[(line.IndexOf(splitter) + 1)..]);
+			});
+
+		public static HashSet<string> GetBadPasswordLines(HashSet<string> lines, HashSet<string> badpasswords) {
+			ConcurrentBag<string> result = new();
+			Parallel.ForEach(lines, line => {
+				char splitter = LineUtils.GetSplitter(line);
+				if (splitter == '@') return;
+				string pass = line.Split(splitter)[1];
+				if (badpasswords.Contains(pass))
+					result.Add($"#Gener# {line}");
+			});
+			return new HashSet<string>(result);
+		}
+		*/
 		public static void WriteSBToFile(StringBuilder sb, int length, string file) {
 			if (sb.Length < length) return;
-            File.AppendAllText(file, sb.ToString());
-            sb.Clear();
-        }
+			File.AppendAllText(file, sb.ToString());
+			sb.Clear();
+		}
 	}
 }
