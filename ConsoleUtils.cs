@@ -6,8 +6,8 @@ namespace consoleutils {
 
 	internal class ConsoleUtils {
 		private const string baseKeyPath = @"*\shell\BaseCleaner_by_flooks";
-		private static readonly string[] subCommands = { "bCleanDups", "bCleanSameMails", "bCleanSamePass", "bMPtoLP", "bRandomize", "bGetPasswords", "bGetMails", "bGetLogins", "bGetDomains", "bSplitLines", "bSplitSize", "bReplaceSplitter" };
-		private static readonly string[] nameCommands = { "Delete duplicate lines", "Delete duplicate mails", "Delete duplicate passwords", "MailPass to LoginPass", "Randomize lines", "Get passwords", "Get mails", "Get logins", "Get domains", "Split by lines", "Split by size", "Replace ; to :" };
+		private static readonly string[] subCommands = { "bCleanDups", "bCleanSameMails", "bCleanSamePass", "bMPtoLP", "bRandomize", "bGetPasswords", "bGetMails", "bGetLogins", "bGetDomains", "bSplitLines", "bSplitSize", "bReplaceDelimiter" };
+		private static readonly string[] nameCommands = { "Delete duplicate lines", "Delete duplicate logins", "Delete duplicate passwords", "MailPass to LoginPass", "Randomize lines", "Get passwords", "Get mails", "Get logins", "Get domains", "Split by lines", "Split by size", "Replace ; to :" };
 		private static readonly Dictionary<string, string> firstValues = new() { { "Icon", "SHELL32.dll,134" }, { "MUIVerb", "Clean BD" }, { "SubCommands", string.Join(";", subCommands) } };
 
 		public static void WriteColorized(string text, ConsoleColor color) {

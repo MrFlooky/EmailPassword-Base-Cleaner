@@ -39,11 +39,11 @@ namespace fileutils {
 				sw.WriteLine(line);
 		}
 		
-		public static void WriteListToFile(string filename, List<string> lines, bool append) {
+		/*public static void WriteListToFile(string filename, List<string> lines, bool append) {
 			using StreamWriter sw = new(filename, append);
 			foreach (string line in lines)
 				sw.WriteLine(line);
-		}
+		}*/
 
 		public static Dictionary<string, string> WriteToDictionary(string fileName) {
 			Dictionary<string, string> result = new();
@@ -57,6 +57,7 @@ namespace fileutils {
 
 		public static async Task<HashSet<string>> DNSCheck(string path, double linesCount, int step) {
 			HashSet<string> goodDNS = WriteToHashSet(Config.files[3]);
+			HashSet<string> newTemps = new();
 			ConcurrentBag<string> badDNS = new(WriteToHashSet(Config.files[0]));
 			ConcurrentBag<string> domains = new();
 			int sstep = 1;
@@ -68,13 +69,20 @@ namespace fileutils {
 				if (i++ % roundedCount == 0)
 					Console.Title = $"[{step}] {Math.Round(i / roundedCount, 0)}% | Filtering DNS addresses.";
 				Match match = Config.domainCheck.Match(line);
-				if (!match.Success && !Config.domainRegex.IsMatch(line))
-					return;
+				if (!match.Success && !Config.domainRegex.IsMatch(line)) return;
 				string domain = match.Groups[1].Value.ToLower();
+				if (Config.tempRegex.IsMatch(domain)) {
+					tempDomains.Add(domain);
+					newTemps.Add(domain);
+					return;
+				}
 				if (!domains.Contains(domain) && !goodDNS.Contains(domain) && !badDNS.Contains(domain) && !tempDomains.Contains(domain))
 					domains.Add(domain);
 			});
-			goodDNS = null;
+				goodDNS = null;
+			if (newTemps.Count > 0)
+				WriteHashsetToFile(Config.files[4], newTemps, true);
+			newTemps = null;
 			i = 0;
 			ConsoleUtils.WriteColorized($"[{step}.{sstep}] ", ConsoleColor.Green);
 			if (domains.IsEmpty) {
@@ -112,7 +120,7 @@ namespace fileutils {
 					foreach (string domain in chunk) {
 						await semaphore.WaitAsync();
 						try {
-							for (int y = 0; y < 2; ++y) {
+							for (int y = 0; y < 2; ++y)
 								try {
 									var result = await client.QueryAsync(domain, QueryType.MX);
 									if (result.Answers.MxRecords().Any()) {
@@ -133,7 +141,6 @@ namespace fileutils {
 										Interlocked.Increment(ref badDNSCount);
 									}
 								}
-							}
 							i = goodDNSCount + badDNSCount;
 							if (i % roundedCount == 0)
 								Console.Title = $"[{step}.{sstep}] {Math.Round(i / roundedCount, 0)}% | Checking DNS's MX of domains.";
@@ -166,20 +173,20 @@ namespace fileutils {
 					string[] logpass = i.Split(splitter);
 					string log = logpass[0];
 					if (mail.Contains(log))
-                        dmail.Add(log);
-                    mail.Add(log);
+						dmail.Add(log);
+					mail.Add(log);
 					lines.Add(i);
 				}
 			}
 			foreach (string i in lines) {
-                char splitter = LineUtils.GetSplitter(i);
-                if (splitter == '@') continue;
-                string[] logpass = i.Split(splitter);
-                string log = logpass[0];
+				char splitter = LineUtils.GetSplitter(i);
+				if (splitter == '@') continue;
+				string[] logpass = i.Split(splitter);
+				string log = logpass[0];
 				if (!dmail.Contains(log))
 					good.Add(i);
 				else {
-					bad.Add($"#Generated# {i}");
+					bad.Add($"#DupMail# {i}");
 					badCount++;
 				}
 			}

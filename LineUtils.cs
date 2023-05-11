@@ -52,7 +52,7 @@ namespace lineutils {
 			//PASS CHECK
 
 			if (Config.removeEmptyPass && typeOfLine && mailPass[1] == "")
-				return $"#EmptyPass#";
+				return "#EmptyPass#";
 
 			string[] loginDomain = mailPass[0].ToLower().Split('@');
 			mailPass[1] = mailPass[1].Replace("№", "");
@@ -60,26 +60,26 @@ namespace lineutils {
 			//EMAIL CHECK
 
 			if (Config.removeXumer && line.Contains("xrum"))
-				return $"#Xrumer#";
+				return "#Xrumer#";
 
 			if (Config.removeEqualLoginPass && typeOfLine &&
 				mailPass[1] == loginDomain[0] ||
 				mailPass[1] == loginDomain[1] ||
 				mailPass[1] == mailPass[0] ||
 				mailPass[1] == $"{loginDomain[0]}@{loginDomain[1].Split('.')[0]}")
-				return $"#PassIsLogin#";
+				return "#PassIsLogin#";
 
 			if (Config.removeXXXX &&
 				gmails.Contains(loginDomain[1]) && loginDomain[0].Contains("xxxx"))
-				return $"#GoogleXXXX#";
+				return "#GoogleXXXX#";
 
 			if (Config.removeTempMail && FileUtils.tempDomains.Contains(loginDomain[1]))
-				return $"#TempMail#";
+				return "#TempMail#";
 
 			//DOMAIN FIX
 
 			if (Config.checkDNS && badDNS.Contains(loginDomain[1]))
-				return $"#BadDNS#";
+				return "#BadDNS#";
 
 			//LOGIN FIX
 
@@ -90,10 +90,10 @@ namespace lineutils {
 				loginDomain[0] = loginDomain[0].Replace(".", "");
 
 			if (gmails.Contains(loginDomain[1]) && (loginDomain[0].Length < 6 || loginDomain[0].Length > 30))
-				return $"#FakeGmail#";
+				return "#FakeGmail#";
 
 			if (Config.fixDotsYandex && yandexs.Contains(loginDomain[1]) && loginDomain[0].Contains('.'))
-				loginDomain[0] = loginDomain[0].Replace(".", "-");
+				loginDomain[0] = loginDomain[0].Replace('.', '-');
 
 			//PASS FIX
 
@@ -134,19 +134,21 @@ namespace lineutils {
 			string[] splitLine = line.Split(splitter);
 			splitLine[0] = splitLine[0].ToLower();
 			string[] temp = splitLine[0].Split('@')[1].Split('.');
-			string domain = temp[0];
-			string zone = string.Join('.', temp.Skip(1));
+			string domain = temp[^2];
+			string zone = temp[^1];
 			templine = $"{splitLine[0].Split('@')[0]}@";
+			if (temp.Length >= 3)
+				for (int i = 0; i < temp.Length - 2; i++)
+					templine += temp[i] + '.';
 			string fixedDomain = DomainFix(domain);
 			templine += fixedDomain;
-			string fixedZone;
-			if (fixedDomain == "gmail")
-				fixedZone = ".com";
-			else
+			string fixedZone = ".com";
+			if (fixedDomain != "gmail")
 				fixedZone = ZoneFix(zone);
 			templine += fixedZone;
 			if (splitter != '@' && splitLine.Length >= 2)
-				templine += ":" + string.Join(":", splitLine.Skip(1));
+				for (int i = 1; i <= splitLine.Length - 1; i++)
+					templine += ':' + splitLine[i];
 			return templine;
 		}
 

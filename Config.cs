@@ -42,14 +42,17 @@ namespace config {
 		public static bool workWithcontext = false;
 
 		private static readonly string domainPartRegex = @"(?:[A-Za-z\d][A-Za-z\d-]*\.)+[A-Za-z]?[A-Za-z\d]{1,10}";
-		private static readonly string mailPartRegex = @"[A-Za-z\d][\w.+-]*@" + domainPartRegex;
+		private static readonly string loginPartRegex = @"[A-Za-z\d][\w.+-]*";
+		private static readonly string mailPartRegex = loginPartRegex + '@' + domainPartRegex;
 		public static Regex hashRegex = new(@"^(?=(?:.*[a-f]){3})[\da-f$.]{16,}$");
+		public static Regex loginRegex = new('^' + loginPartRegex + '$');
 		public static Regex htmlencodeRegex = new(@"&[A-Za-z\d]{2,6};");
-		public static Regex loginpassRegex = new(@"^" + mailPartRegex + "[;:].*?$");
-		public static Regex loginpassPartialRegex = new(mailPartRegex + @"[;:].*?(?:[;:]|$)");
-		public static Regex mailRegex = new(@"^" + mailPartRegex + "$");
+		public static Regex loginpassRegex = new('^' + mailPartRegex + "[;:].*?$");
+		public static Regex loginpassPartialRegex = new(mailPartRegex + "[;:].*?(?:[;:]|$)");
+		public static Regex mailRegex = new('^' + mailPartRegex + '$');
 		public static Regex domainCheck = new(@"@([\w-]+(?:\.[\w-]+)+)(?::|$)");
-		public static Regex domainRegex = new("^" + domainPartRegex + "$");
+		public static Regex domainRegex = new('^' + domainPartRegex + '$');
+		public static Regex tempRegex = new(@"^(?:(?:[A-Za-z\d][A-Za-z\d-]*\.){5,}[A-Za-z]?[A-Za-z\d]{1,10}|(?:[\da-zA-Z]+\.)+[a-zA-Z]{3}(?:\.co)?\.kr|[a-z]\.[A-Za-z\d]+\.ro|gmail\.com(?:\.?[a-zA-Z\d]+)+|worldcup2019-\d+\.xyz|.*?(?:spam.*?|(?:\.com?){2,}|(?:temp|trash).*(?:e?mail|(?:in)?box).*?|\.(?:(?:creo|oazis)\.site|(?:ddnsfree|epizy|emlpro|emlhub|emltmp|anonaddy|ezyro|email-temp|33mail|t(?:mp)?eml|ourhobby|urbanban|mailinator|thumoi|unaux|chickenkiller|ignorelist|anhaysuka|ibaloch|twilightparadox|boxmaill|xxi2|somee|luk2|mintemail|mooo|batikbantul|dnsabr|kozow|3utilities|servegame|giize|theworkpc|gettrials|x24hr)\.com|(?:dropmail|anonaddy|bgsaddrmwn|myddns|nctu|bccto)\.me|(?:freeml|anonbox|dns-cloud|ll47|sytes|teml|dynu|bounceme)\.net|(?:heliohost|craigslist|zapto|eu)\.org|(?:ml|tk|cf|ga|gq)|(?:usa|nut|flu|cu)\.cc|(?:vuforia|hmail)\.us|(?:web|my)\.id|(?:yomail|toh)\.info|10mail\.(?:org|tk)|567map\.xyz|cloudns\.(?:cc|ph|nz|cx|asia|cl)|ddns\.(?:net|info|me\.uk)|esy\.es|igg\.biz|lofteone\.ru|mailr\.eu|pp\.ua|spymail\.one)))$", RegexOptions.IgnorePatternWhitespace);
 		public static Dictionary<string, string> fixDomainsDictionary = new();
 		public static Dictionary<string, string> fixZonesDictionary = new();
 		public static HashSet<string> domains = new();
@@ -250,7 +253,7 @@ namespace config {
 			stopWatch.Stop();
 			ConsoleUtils.WriteColorized($"[{step}] ", ConsoleColor.Green);
 			TimeSpan time = TimeSpan.FromSeconds(stopWatch.Elapsed.TotalSeconds);
-			Console.WriteLine($"Done! Elapsed {time:h\\h\\ m\\m\\ s\\s}.\r\n");
+			Console.WriteLine($"Done! Elapsed {time:h\\h\\ m\\m\\ s\\s}.");
 			Console.Title = "Idle.";
 		}
 
