@@ -11,7 +11,9 @@ namespace config {
 		public static string path = "";
 		public static string currentDir = AppDomain.CurrentDomain.BaseDirectory;
 		public static string exePath = Process.GetCurrentProcess().MainModule.FileName;
-		public static string[] files = new string[6] { $"{currentDir}BadDNS", $"{currentDir}FixDomains", $"{currentDir}FixZone", $"{currentDir}GoodDNS", $"{currentDir}TempMails", $"{currentDir}config.cfg" };
+		public static string[] files = new string[6] { $"{currentDir}BadDNS",
+			$"{currentDir}FixDomains", $"{currentDir}FixZone", $"{currentDir}GoodDNS",
+			$"{currentDir}TempMails", $"{currentDir}config.cfg" };
 
 		public static readonly string checkDNS_prompt = "Check DNS of domains in emails? y / n";
 		public static readonly string fixDomains_prompt = "Fix domains and domain zones? y / n";
@@ -41,8 +43,8 @@ namespace config {
 		public static bool workWithArgs = false;
 		public static bool workWithcontext = false;
 
-		private static readonly string domainPartRegex = @"(?:[A-Za-z\d][A-Za-z\d-]*\.)+[A-Za-z]?[A-Za-z\d]{1,10}";
-		private static readonly string loginPartRegex = @"[A-Za-z\d][\w.+-]*";
+		private static readonly string domainPartRegex = @"(?:[A-Za-z\d][A-Za-z\d-]*\.)+([A-Za-z]?[A-Za-z\d]{1,10}|xn--[a-z\d]{4,18})";
+		private static readonly string loginPartRegex = @"[A-Za-z\d](?!.*[-._]{2,})(?!(?:[^+]*\+){2})[\w.+-]*";
 		private static readonly string mailPartRegex = loginPartRegex + '@' + domainPartRegex;
 		public static Regex hashRegex = new(@"^(?=(?:.*[a-f]){3})[\da-f$.]{16,}$");
 		public static Regex loginRegex = new('^' + loginPartRegex + '$');
@@ -116,8 +118,8 @@ namespace config {
 			workWithArgs = !string.IsNullOrEmpty(output);
 			string fileName = Path.GetFileNameWithoutExtension(path);
 			output = output.Split('.')[0];
-			string[] allFiles = new string[3] { $"./{output}_shit.tmp",
-					$"./{output}.tmp", $"./{output}_tmp.tmp" };
+			string[] allFiles = new string[3] { $"./{output}_shit.tmp", 
+				$"./{output}.tmp", $"./{output}_tmp.tmp" };
 			if (workWithcontext)
 				allFiles = new string[3] { $"{output}_shit.tmp",
 					$"{output}.tmp", $"{output}_tmp.tmp" };

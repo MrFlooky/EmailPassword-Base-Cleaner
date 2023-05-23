@@ -57,9 +57,9 @@ namespace fileutils {
 
 		public static async Task<HashSet<string>> DNSCheck(string path, double linesCount, int step) {
 			HashSet<string> goodDNS = WriteToHashSet(Config.files[3]);
-			HashSet<string> newTemps = new();
 			ConcurrentBag<string> badDNS = new(WriteToHashSet(Config.files[0]));
-			ConcurrentBag<string> domains = new();
+			HashSet<string> newTemps = new();
+			ConcurrentDictionary<string, byte> domains = new();
 			int sstep = 1;
 			ConsoleUtils.WriteColorized($"[{step}.{sstep}] ", ConsoleColor.DarkYellow);
 			Console.WriteLine("Filtering DNS addresses.");
@@ -76,10 +76,10 @@ namespace fileutils {
 					newTemps.Add(domain);
 					return;
 				}
-				if (!domains.Contains(domain) && !goodDNS.Contains(domain) && !badDNS.Contains(domain) && !tempDomains.Contains(domain))
-					domains.Add(domain);
+				if (!domains.ContainsKey(domain) && !goodDNS.Contains(domain) && !badDNS.Contains(domain) && !tempDomains.Contains(domain))
+					domains.TryAdd(domain, 0);
 			});
-				goodDNS = null;
+			goodDNS = null;
 			if (newTemps.Count > 0)
 				WriteHashsetToFile(Config.files[4], newTemps, true);
 			newTemps = null;
@@ -89,7 +89,7 @@ namespace fileutils {
 				Console.WriteLine("No new DNS addresses found.");
 				return badDNS.ToHashSet();
 			}
-			List<List<string>> chunks = domains.ToList()
+			List<List<string>> chunks = domains.Keys.ToList()
 				.Select((domain, index) => new { domain, index })
 				.GroupBy(x => x.index / 40)
 				.Select(g => g.Select(x => x.domain).ToList())

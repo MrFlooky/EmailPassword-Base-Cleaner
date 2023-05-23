@@ -20,7 +20,7 @@ while (true) {
         Console.Clear();
     }
     if (Config.path.ToLower() == "link") {
-        Console.WriteLine("Hey! It's not valid path :)");
+        Console.WriteLine("Hey! It's not a valid path :)");
         Process.Start(new ProcessStartInfo("cmd", $"/c start http://bhf.gg/members/217675/") { CreateNoWindow = true });
         continue;
     }
