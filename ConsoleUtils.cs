@@ -7,7 +7,7 @@ namespace consoleutils {
 
 	internal class ConsoleUtils {
 		private const string baseKeyPath = @"*\shell\BaseCleaner_by_flooks";
-		private static readonly string[] subCommands = { "bCleanDups", "bCleanSameMails",
+		private static readonly string[] subCommands = { "bCleanDups", "bCleanSameMails", 
 			"bCleanSamePass", "bMPtoLP", "bRandomize", "bGetPasswords", "bGetMails", "bGetLogins",
 			"bGetDomains", "bSplitLines", "bSplitSize", "bReplaceDelimiter", "bRemoveContextMenu" };
 		private static readonly string[] nameCommands = { "Delete duplicate lines",
