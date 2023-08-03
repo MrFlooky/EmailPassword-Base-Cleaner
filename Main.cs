@@ -15,7 +15,7 @@ namespace main {
 		public static long shitCount = 0;
 		public static double roundedCount = 0;
 
-		public static bool workWithContext = false;
+		public static bool workWithContext = false; 
 		public static bool workWithArgs = false;
 
 		public static string[] Initialize(string output) {
