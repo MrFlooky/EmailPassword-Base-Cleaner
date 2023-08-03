@@ -4,12 +4,14 @@ using System.Collections.Concurrent;
 using System.Text;
 using System.Text.RegularExpressions;
 using config;
+using main;
 using lineutils;
 
 namespace fileutils {
 
 	public class FileUtils {
 		public static readonly HashSet<string> tempDomains = WriteToHashSet(Config.files[4]);
+		public static readonly Regex tempRegex = new(@"^(?:(?:[A-Za-z\d][A-Za-z\d-]*\.){5,}[A-Za-z]?[A-Za-z\d]{1,10}|(?:[\da-zA-Z]+\.)+[a-zA-Z]{3}(?:\.co)?\.kr|[a-z]\.[A-Za-z\d]+\.ro|gmail\.com(?:\.?[a-zA-Z\d]+)+|worldcup2019-\d+\.xyz|.*?(?:spam.*?|(?:\.com?){2,}|(?:temp|trash).*(?:e?mail|(?:in)?box).*?|\.(?:(?:creo|oazis)\.site|(?:ddnsfree|epizy|emlpro|emlhub|emltmp|anonaddy|ezyro|email-temp|33mail|t(?:mp)?eml|ourhobby|urbanban|mailinator|thumoi|unaux|chickenkiller|ignorelist|anhaysuka|ibaloch|twilightparadox|boxmaill|xxi2|somee|luk2|mintemail|mooo|batikbantul|dnsabr|kozow|3utilities|servegame|giize|theworkpc|gettrials|x24hr)\.com|(?:dropmail|anonaddy|bgsaddrmwn|myddns|nctu|bccto)\.me|(?:freeml|anonbox|dns-cloud|ll47|sytes|teml|dynu|bounceme)\.net|(?:heliohost|craigslist|zapto|eu)\.org|(?:ml|tk|cf|ga|gq)|(?:usa|nut|flu|cu)\.cc|(?:vuforia|hmail)\.us|(?:web|my)\.id|(?:yomail|toh)\.info|10mail\.(?:org|tk)|567map\.xyz|cloudns\.(?:cc|ph|nz|cx|asia|cl)|ddns\.(?:net|info|me\.uk)|esy\.es|igg\.biz|lofteone\.ru|mailr\.eu|pp\.ua|spymail\.one)))$", RegexOptions.IgnorePatternWhitespace);
 
 		public static double GetLinesCount(string path) {
 			double i = 0;
@@ -55,23 +57,24 @@ namespace fileutils {
 			return result;
 		}
 
-		public static async Task<HashSet<string>> DNSCheck(string path, double linesCount, int step) {
+		public static async Task<HashSet<string>> DNSCheck(string path) {
+			Main.step++;
 			HashSet<string> goodDNS = WriteToHashSet(Config.files[3]);
 			ConcurrentBag<string> badDNS = new(WriteToHashSet(Config.files[0]));
 			HashSet<string> newTemps = new();
 			ConcurrentDictionary<string, byte> domains = new();
 			int sstep = 1;
-			ConsoleUtils.WriteColorized($"[{step}.{sstep}] ", ConsoleColor.DarkYellow);
+			ConsoleUtils.WriteColorized($"[{Main.step}.{sstep}] ", ConsoleColor.DarkYellow);
 			Console.WriteLine("Filtering DNS addresses.");
-			Console.Title = $"[{step}.{sstep}] 0% | Filtering DNS addresses.";
-			double roundedCount = Math.Ceiling(linesCount / 100), i = 0;
+			Console.Title = $"[{Main.step}.{sstep}] 0% | Filtering DNS addresses.";
+			double roundedCount = Math.Ceiling(Main.lines / 100), i = 0;
 			Parallel.ForEach(File.ReadLines(path), Config.options, line => {
 				if (i++ % roundedCount == 0)
-					Console.Title = $"[{step}] {Math.Round(i / roundedCount, 0)}% | Filtering DNS addresses.";
+					Console.Title = $"[{Main.step}] {Math.Round(i / roundedCount, 0)}% | Filtering DNS addresses.";
 				Match match = Config.domainCheck.Match(line);
 				if (!match.Success && !Config.domainRegex.IsMatch(line)) return;
 				string domain = match.Groups[1].Value.ToLower();
-				if (Config.tempRegex.IsMatch(domain)) {
+				if (tempRegex.IsMatch(domain)) {
 					tempDomains.Add(domain);
 					newTemps.Add(domain);
 					return;
@@ -84,7 +87,7 @@ namespace fileutils {
 				WriteHashsetToFile(Config.files[4], newTemps, true);
 			newTemps = null;
 			i = 0;
-			ConsoleUtils.WriteColorized($"[{step}.{sstep}] ", ConsoleColor.Green);
+			ConsoleUtils.WriteColorized($"[{Main.step}.{sstep}] ", ConsoleColor.Green);
 			if (domains.IsEmpty) {
 				Console.WriteLine("No new DNS addresses found.");
 				return badDNS.ToHashSet();
@@ -95,13 +98,13 @@ namespace fileutils {
 				.Select(g => g.Select(x => x.domain).ToList())
 				.ToList();
 			domains = null;
-			linesCount = chunks.Sum(chunk => chunk.Count);
-			roundedCount = Math.Ceiling(linesCount / 100);
-			Console.Write($"Done! There is {linesCount} domains to check.\n");
+			Main.lines = chunks.Sum(chunk => chunk.Count);
+			roundedCount = Math.Ceiling(Main.lines / 100);
+			Console.Write($"Done! There is {Main.lines} domains to check.\n");
 			sstep++;
-			ConsoleUtils.WriteColorized($"[{step}.{sstep}] ", ConsoleColor.DarkYellow);
+			ConsoleUtils.WriteColorized($"[{Main.step}.{sstep}] ", ConsoleColor.DarkYellow);
 			Console.WriteLine("Checking DNS's MX of domains. Please wait...");
-			Console.Title = $"[{step}.{sstep}] 0% | Checking DNS's MX of domains.";
+			Console.Title = $"[{Main.step}.{sstep}] 0% | Checking DNS's MX of domains.";
 			StringBuilder badDNSBuilder = new(capacity: 10000000);
 			StringBuilder goodDNSBuilder = new(capacity: 10000000);
 			LookupClient client = new(new LookupClientOptions {
@@ -120,30 +123,27 @@ namespace fileutils {
 					foreach (string domain in chunk) {
 						await semaphore.WaitAsync();
 						try {
-							for (int y = 0; y < 2; ++y)
-								try {
-									var result = await client.QueryAsync(domain, QueryType.MX);
-									if (result.Answers.MxRecords().Any()) {
-										goodDNSBuilder.AppendLine(domain);
-										Interlocked.Increment(ref goodDNSCount);
-									}
-									else {
-										badDNSBuilder.AppendLine(domain);
-										badDNS.Add(domain);
-										Interlocked.Increment(ref badDNSCount);
-									}
-									break;
+							try {
+								var result = await client.QueryAsync(domain, QueryType.MX);
+								if (result.Answers.MxRecords().Any()) {
+									goodDNSBuilder.AppendLine(domain);
+									Interlocked.Increment(ref goodDNSCount);
 								}
-								catch (Exception) {
-									if (y == 1) {
-										badDNSBuilder.AppendLine(domain);
-										badDNS.Add(domain);
-										Interlocked.Increment(ref badDNSCount);
-									}
+								else {
+									badDNSBuilder.AppendLine(domain);
+									badDNS.Add(domain);
+									Interlocked.Increment(ref badDNSCount);
 								}
+								break;
+							}
+							catch (Exception) {
+								badDNSBuilder.AppendLine(domain);
+								badDNS.Add(domain);
+								Interlocked.Increment(ref badDNSCount);
+							}
 							i = goodDNSCount + badDNSCount;
 							if (i % roundedCount == 0)
-								Console.Title = $"[{step}.{sstep}] {Math.Round(i / roundedCount, 0)}% | Checking DNS's MX of domains.";
+								Console.Title = $"[{Main.step}.{sstep}] {Math.Round(i / roundedCount, 0)}% | Checking DNS's MX of domains.";
 						}
 						finally {
 							semaphore.Release();
@@ -156,120 +156,52 @@ namespace fileutils {
 
 			badDNSBuilder = null;
 			goodDNSBuilder = null;
-			ConsoleUtils.WriteColorized($"[{step}.{sstep}] ", ConsoleColor.Green);
+			ConsoleUtils.WriteColorized($"[{Main.step}.{sstep}] ", ConsoleColor.Green);
 			Console.WriteLine($"Done! There is new {badDNSCount} bad DNS's and {goodDNSCount} good DNS's.");
 			return badDNS.ToHashSet();
 		}
 
-		public static void GenerDelete(string path, ref long badCount, ref HashSet<string> good, ref HashSet<string> bad) {
-			HashSet<string> mail = new();
-			HashSet<string> dmail = new();
-			HashSet<string> lines = new();
+		public static void GenerDelete(string path, ref long badCount, out HashSet<string> good1, out HashSet<string> bad1) {
+			HashSet<string> good = new(), bad = new(), mail = new(), dmail = new();
+			List<string> lines = new();
 			using (StreamReader f = new(path)) {
-				string i;
-				while ((i = f.ReadLine()) != null) {
-					char splitter = LineUtils.GetSplitter(i);
-					if (splitter == '@') continue;
-					string[] logpass = i.Split(splitter);
+				string line;
+				while ((line = f.ReadLine()) != null) {
+					char splitter = LineUtils.GetSplitter(line);
+					if (splitter == '@' || splitter == '\0') continue;
+					string[] logpass = line.Split(splitter);
 					string log = logpass[0];
-					if (mail.Contains(log))
+					if (!mail.Add(log))
 						dmail.Add(log);
-					mail.Add(log);
-					lines.Add(i);
+					lines.Add(line);
 				}
 			}
-			foreach (string i in lines) {
-				char splitter = LineUtils.GetSplitter(i);
-				if (splitter == '@') continue;
-				string[] logpass = i.Split(splitter);
+			foreach (string line in lines) {
+				char splitter = LineUtils.GetSplitter(line);
+				if (splitter == '@' || splitter == '\0') continue;
+				string[] logpass = line.Split(splitter);
 				string log = logpass[0];
 				if (!dmail.Contains(log))
-					good.Add(i);
+					good.Add(line);
 				else {
-					bad.Add($"#DupMail# {i}");
+					bad.Add($"#DupMail# {line}");
 					badCount++;
 				}
 			}
+			bad1 = bad;
+			good1 = good;
 		}
 
-		/*public static void GenerDelete(string path, ref long badCount, ref HashSet<string> lines, ref HashSet<string> bad) {
-			lines = WriteToHashSet(path);
-			HashSet<string> passwords = new();
-			HashSet<string> badpasswords = new();
-			HashSet<string> mails = new();
-			foreach (string line in lines) {
-				char splitter = LineUtils.GetSplitter(line);
-				if (splitter == '@') continue;
-				string[] lp = line.Split(splitter);
-				if (Config.hashRegex.IsMatch(lp[1])) continue;
-				if (passwords.Contains(lp[1]) && mails.Contains(lp[0])) continue;
-				mails.Add(lp[0].Split('@')[0]);
-				passwords.Add(lp[1]);
-			}
-			/*try {
-				for (int i = 0; i < passwords.Count; ++i) {
-					string pass1 = passwords.ElementAt(i);
-					string mail1 = mails.ElementAt(i);
-					for (int j = 0; j < passwords.Count; ++j) {
-						string pass2 = passwords.ElementAt(j);
-						string mail2 = mails.ElementAt(j);
-						if (pass2 == "111111123") {
-							string asd = "";
-						}
-						if (badpasswords.Contains(passwords.ElementAt(j))) continue;
-						if (pass1 == pass2 && mail1 != mail2) continue;
-						if (LineUtils.StringCompare(pass1, pass2) <= 3) {
-							badpasswords.Add(pass2);
-							badCount++;
-							break;
-						}
-					}
-				}
-			}
-			catch {
-				string asd = "";
-			}*/
-
-			/*foreach (string pass1 in passwords) {
-				foreach (string pass2 in passwords) {
-					if (badpasswords.Contains(pass2)) continue;
-					if (pass1 == pass2) continue;
-					int sum = LineUtils.StringCompare(pass1, pass2);
-					if (sum <= 3) {
-						badpasswords.Add(pass2);
-						badCount++;
-						break;
-					}
-				}
-			}
-
-			bad = GetBadPasswordLines(lines, badpasswords);
-			DeleteBadPasswords(lines, badpasswords);
-		}*/
-
-		/*public static void DeleteBadPasswords(HashSet<string> lines, HashSet<string> badpasswords) =>
-			lines.RemoveWhere(line => {
-				char splitter = LineUtils.GetSplitter(line);
-				if (splitter == '@') return false;
-				return badpasswords.Contains(line[(line.IndexOf(splitter) + 1)..]);
-			});
-
-		public static HashSet<string> GetBadPasswordLines(HashSet<string> lines, HashSet<string> badpasswords) {
-			ConcurrentBag<string> result = new();
-			Parallel.ForEach(lines, line => {
-				char splitter = LineUtils.GetSplitter(line);
-				if (splitter == '@') return;
-				string pass = line.Split(splitter)[1];
-				if (badpasswords.Contains(pass))
-					result.Add($"#Gener# {line}");
-			});
-			return new HashSet<string>(result);
-		}
-		*/
 		public static void WriteSBToFile(StringBuilder sb, int length, string file) {
 			if (sb.Length < length) return;
 			File.AppendAllText(file, sb.ToString());
 			sb.Clear();
+		}
+
+		public static void WriteCBToFile(ConcurrentBag<string> cb, int length, string file) {
+			if (cb.Count < length) return;
+			File.AppendAllText(file, string.Join(Environment.NewLine, cb));
+			cb.Clear();
 		}
 	}
 }

@@ -1,6 +1,7 @@
 ﻿using config;
 using Microsoft.Win32;
 using contextfunctions;
+using main;
 
 namespace consoleutils {
 
@@ -8,11 +9,11 @@ namespace consoleutils {
 		private const string baseKeyPath = @"*\shell\BaseCleaner_by_flooks";
 		private static readonly string[] subCommands = { "bCleanDups", "bCleanSameMails",
 			"bCleanSamePass", "bMPtoLP", "bRandomize", "bGetPasswords", "bGetMails", "bGetLogins",
-			"bGetDomains", "bSplitLines", "bSplitSize", "bReplaceDelimiter" };
+			"bGetDomains", "bSplitLines", "bSplitSize", "bReplaceDelimiter", "bRemoveContextMenu" };
 		private static readonly string[] nameCommands = { "Delete duplicate lines",
 			"Delete duplicate logins", "Delete duplicate passwords", "MailPass to LoginPass",
 			"Randomize lines", "Get passwords", "Get mails", "Get logins", "Get domains",
-			"Split by lines", "Split by size", "Replace ; to :" };
+			"Split by lines", "Split by size", "Replace ; to :", "Remove app from context menu" };
 		private static readonly Dictionary<string, string> firstValues = new() { { "Icon", "SHELL32.dll,134" }, { "MUIVerb", "Clean BD" }, { "SubCommands", string.Join(";", subCommands) } };
 
 		public static void WriteColorized(string text, ConsoleColor color) {
@@ -44,7 +45,7 @@ namespace consoleutils {
 					Environment.Exit(0);
 				}
 				output = $"{Path.GetDirectoryName(input)}\\{Path.GetFileNameWithoutExtension(input)}_result.txt";
-				Config.workWithcontext = true;
+				Main.workWithContext = true;
 				return true;
 			}
 			if (length == 3 && subCommands.Contains(args[2])) {
@@ -52,19 +53,19 @@ namespace consoleutils {
 				Console.Title = args[2][1..];
 				switch (args[2]) {
 					case "bCleanDups":
-						ContextFunctions.DeleteDuplicates();
+						ContextFunctions.CleanDups();
 						break;
 					case "bCleanSameMails":
-						ContextFunctions.DeleteDuplicateEmails();
+						ContextFunctions.CleanSameMails();
 						break;
 					case "bCleanSamePass":
-						ContextFunctions.DeleteDuplicatePasswords();
+						ContextFunctions.CleanSamePass();
 						break;
 					case "bMPtoLP":
-						ContextFunctions.MailPassToLoginPass();
+						ContextFunctions.MPtoLP();
 						break;
 					case "bRandomize":
-						ContextFunctions.RandomizeLines();
+						ContextFunctions.Randomize();
 						break;
 					case "bGetPasswords":
 						ContextFunctions.GetPasswords();
@@ -79,13 +80,16 @@ namespace consoleutils {
 						ContextFunctions.GetDomains();
 						break;
 					case "bSplitLines":
-						ContextFunctions.SplitByLines();
+						ContextFunctions.SplitLines();
 						break;
 					case "bSplitSize":
-						ContextFunctions.SplitBySize();
+						ContextFunctions.SplitSize();
 						break;
-					case "bReplaceSplitter":
-						ContextFunctions.ReplaceSplitter();
+					case "bReplaceDelimiter":
+						ContextFunctions.ReplaceDelimiter();
+						break;
+					case "bRemoveContextMenu":
+						RemoveContextMenu();
 						break;
 				}
 			}
@@ -122,16 +126,27 @@ namespace consoleutils {
 			Dictionary<string, string> additionalCommands = new();
 			for (int i = 0; i < subCommands.Length; ++i)
 				additionalCommands.Add(subCommands[i], nameCommands[i]);
-
 			foreach (string key in firstValues.Keys)
 				Registry.SetValue(@"HKEY_CLASSES_ROOT\" + baseKeyPath, key, firstValues[key]);
-
 			foreach (string key in additionalCommands.Keys) {
 				string path = $@"HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\{key}";
 				Registry.SetValue(path, "MUIVerb", additionalCommands[key]);
 				Registry.SetValue($@"{path}\command", null, $"\"{Config.exePath}\" \"-input\" \"%1\" \"{key}\"");
 			}
 			Console.WriteLine("Software has been successfully added to the context menu!");
+		}
+
+		public static void RemoveContextMenu() {
+			RegistryKey subKey = RegistryKey.OpenBaseKey(RegistryHive.ClassesRoot, RegistryView.Default);
+			subKey.DeleteSubKeyTree(baseKeyPath);
+			foreach (string key in subCommands) {
+				string path = $@"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\CommandStore\shell\{key}";
+				subKey = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Default);
+				subKey.DeleteSubKeyTree(path);
+			}
+			Console.WriteLine("Software has been successfully removed from the context menu!");
+			Console.ReadLine();
+			Environment.Exit(0);
 		}
 	}
 }

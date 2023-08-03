@@ -8,7 +8,14 @@ namespace contextfunctions {
 	internal class ContextFunctions {
 		public static string input = "";
 
-		public static void DeleteDuplicates() {
+		private static void SimpleEnd(double i, string msg) {
+			if (i == 0) Console.WriteLine(msg);
+			Console.WriteLine("Done!");
+			Console.ReadLine();
+			Environment.Exit(0);
+		}
+
+		public static void CleanDups() {
 			Console.WriteLine("Deleting duplicates.");
 			FileUtils.WriteHashsetToFile($"{Path.GetDirectoryName(input)}\\{Path.GetFileNameWithoutExtension(input)}_noDup.txt", FileUtils.WriteToHashSet(input), false);
 			Console.WriteLine("Done!");
@@ -16,7 +23,7 @@ namespace contextfunctions {
 			Environment.Exit(0);
 		}
 
-		public static void DeleteDuplicateEmails() {
+		public static void CleanSameMails() {
 			Console.WriteLine("Deleting duplicated logins.");
 			double i = 0;
 			using (StreamWriter sw = new($"{Path.GetDirectoryName(input)}\\{Path.GetFileNameWithoutExtension(input)}_noDupMails.txt", false, Encoding.UTF8, 2072576)) {
@@ -40,13 +47,10 @@ namespace contextfunctions {
 				uniqueEmails = null;
 				sw.Close();
 			}
-			if (i > 0) Console.WriteLine("Done!");
-			else Console.WriteLine("There is all emails are duplicated ;(");
-			Console.ReadLine();
-			Environment.Exit(0);
+			SimpleEnd(i, "There is all emails are duplicated ;(");
 		}
 
-		public static void DeleteDuplicatePasswords() {
+		public static void CleanSamePass() {
 			Console.WriteLine("Deleting duplicated passwords.");
 			double i = 0;
 			using (StreamWriter sw = new($"{Path.GetDirectoryName(input)}\\{Path.GetFileNameWithoutExtension(input)}_noDupPass.txt", false, Encoding.UTF8, 2072576)) {
@@ -63,36 +67,10 @@ namespace contextfunctions {
 				uniquePass = null;
 				sw.Close();
 			}
-			if (i > 0) Console.WriteLine("Done!");
-			else Console.WriteLine("There is all passwords are duplicated ;(");
-			Console.ReadLine();
-			Environment.Exit(0);
+			SimpleEnd(i, "There is all passwords are duplicated ;(");
 		}
 
-		/*public static void MailPassToLoginPass() {
-			Console.WriteLine("Converting mail:pass to login:pass.");
-			double i = 0;
-			string newFile = $"{Path.GetDirectoryName(input)}\\{Path.GetFileNameWithoutExtension(input)}!_.txt";
-			using (StreamWriter sw = new(newFile, false, Encoding.UTF8, 2072576)) {
-				foreach (string line in File.ReadLines(input)) {
-					char splitter = LineUtils.GetSplitter(line);
-					if (splitter == '@' || splitter == '\0') continue;
-					string[] mp = line.Split(splitter);
-					if (Config.mailRegex.IsMatch(mp[0])) {
-						sw.WriteLine($"{mp[0].Split('@')[0]}:{mp[1]}");
-						i++;
-					}
-				}
-			}
-			FileUtils.WriteHashsetToFile($"{Path.GetDirectoryName(input)}\\{Path.GetFileNameWithoutExtension(input)}_LoginPass.txt", FileUtils.WriteToHashSet(newFile), false);
-			File.Delete(newFile);
-			if (i > 0) Console.WriteLine("Done!");
-			else Console.WriteLine("There is no valid mail:pass lines ;(");
-			Console.ReadLine();
-			Environment.Exit(0);
-		}*/
-
-		public static void MailPassToLoginPass() {
+		public static void MPtoLP() {
 			Console.WriteLine("Converting mail:pass to login:pass.");
 			double i = 0;
 			using (StreamWriter sw = new($"{Path.GetDirectoryName(input)}\\{Path.GetFileNameWithoutExtension(input)}_LoginPass.txt", false, Encoding.UTF8, 2072576)) {
@@ -112,13 +90,10 @@ namespace contextfunctions {
 				uniqueLines = null;
 				sw.Close();
 			}
-			if (i > 0) Console.WriteLine("Done!");
-			else Console.WriteLine("There is no valid mail:pass lines ;(");
-			Console.ReadLine();
-			Environment.Exit(0);
+			SimpleEnd(i, "There is no valid mail:pass lines ;(");
 		}
 
-		public static void RandomizeLines() {
+		public static void Randomize() {
 			Console.WriteLine("Randomizing lines.");
 			List<string> list = new(File.ReadLines(input));
 			Random random = new();
@@ -161,10 +136,7 @@ namespace contextfunctions {
 				reader.Close();
 				sw.Close();
 			}
-			if (i > 0) Console.WriteLine("Done!");
-			else Console.WriteLine("There is no passwords ;(");
-			Console.ReadLine();
-			Environment.Exit(0);
+			SimpleEnd(i, "There is no passwords ;(");
 		}
 
 		public static void GetMails() {
@@ -185,12 +157,10 @@ namespace contextfunctions {
 				}
 				reader.Close();
 			}
-			if (mails.Count > 0) {
+			if (mails.Count > 0) 
 				FileUtils.WriteHashsetToFile($"{Path.GetDirectoryName(input)}\\{Path.GetFileNameWithoutExtension(input)}_mails.txt", mails, false);
-				Console.WriteLine("Done!");
-			}
 			else Console.WriteLine("There is no mails ;(");
-			mails = null;
+			Console.WriteLine("Done!");
 			Console.ReadLine();
 			Environment.Exit(0);
 		}
@@ -213,12 +183,10 @@ namespace contextfunctions {
 				}
 				reader.Close();
 			}
-			if (logins.Count > 0) {
+			if (logins.Count > 0) 
 				FileUtils.WriteHashsetToFile($"{Path.GetDirectoryName(input)}\\{Path.GetFileNameWithoutExtension(input)}_logins.txt", logins, false);
-				Console.WriteLine("Done!");
-			}
 			else Console.WriteLine("There is no logins ;(");
-			logins = null;
+			Console.WriteLine("Done!");
 			Console.ReadLine();
 			Environment.Exit(0);
 		}
@@ -241,17 +209,15 @@ namespace contextfunctions {
 				}
 				reader.Close();
 			}
-			if (domains.Count > 0) {
+			if (domains.Count > 0) 
 				FileUtils.WriteHashsetToFile($"{Path.GetDirectoryName(input)}\\{Path.GetFileNameWithoutExtension(input)}_domains.txt", domains, false);
-				Console.WriteLine("Done!");
-			}
 			else Console.WriteLine("There is no domains ;(");
-			domains = null;
+			Console.WriteLine("Done!");
 			Console.ReadLine();
 			Environment.Exit(0);
 		}
 
-		public static void SplitByLines() {
+		public static void SplitLines() {
 			Console.WriteLine("Split base by lines.");
 			double amount_input = FileUtils.GetLinesCount(input), amount;
 			while (true) {
@@ -289,7 +255,7 @@ namespace contextfunctions {
 			Environment.Exit(0);
 		}
 
-		public static void SplitBySize() {
+		public static void SplitSize() {
 			Console.WriteLine("Split base by lines.");
 			string amount_temp;
 			FileInfo fileInfo = new(input);
@@ -329,7 +295,7 @@ namespace contextfunctions {
 			Environment.Exit(0);
 		}
 
-		public static void ReplaceSplitter() {
+		public static void ReplaceDelimiter() {
 			Console.WriteLine("Replace delimiter from ; to :.");
 			using (StreamWriter writer = new($"{Path.GetDirectoryName(input)}\\{Path.GetFileNameWithoutExtension(input)}_replacedSplitter.txt")) {
 				foreach (string line in File.ReadLines(input)) {
