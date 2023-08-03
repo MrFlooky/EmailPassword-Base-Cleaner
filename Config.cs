@@ -69,7 +69,7 @@ namespace config {
 				if (!Main.workWithArgs)
 					Console.Clear();
 				return false;
-			} 
+			}
 			try {
 				var settings = new Dictionary<string, string>();
 				foreach (string line in File.ReadLines(configFile)) {

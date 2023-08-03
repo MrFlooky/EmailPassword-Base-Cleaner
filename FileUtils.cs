@@ -18,7 +18,7 @@ namespace fileutils {
 			foreach (var line in File.ReadLines(path))
 				i += 1;
 			return i;
-		} 
+		}
 
 		public static async Task TempToTxtAsync(string file) {
 			if (!File.Exists(file) || !file.EndsWith(".tmp")) return;

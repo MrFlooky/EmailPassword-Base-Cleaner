@@ -9,7 +9,7 @@ namespace lineutils {
 	internal class LineUtils {
 
 		public static Regex htmlencodeRegex = new(@"&[A-Za-z\d]{2,6};");
- 
+
 		public static string DomainFix(string line) {
 			if (!Config.domains.Contains(line) && Config.fixDomainsDictionary.TryGetValue(line, out string value))
 				return value;

@@ -5,7 +5,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 
 namespace contextfunctions {
-	internal class ContextFunctions { 
+	internal class ContextFunctions {
 		public static string input = "";
 
 		private static void SimpleEnd(double i, string msg) {

@@ -25,7 +25,7 @@ while (true) {
         Console.WriteLine("Hey! It's not a valid path :)");
         Process.Start(new ProcessStartInfo("cmd", $"/c start http://bhf.gg/members/217675/") { CreateNoWindow = true });
         continue;
-    } 
+    }
 	if (Path.GetExtension(Config.path) != ".txt" || !File.Exists(Config.path)) {
         Console.WriteLine("Give me a valid .txt file that exists.");
         if (!Main.workWithArgs) continue;
